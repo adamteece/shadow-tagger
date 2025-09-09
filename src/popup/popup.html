@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shadow Tagger</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="popup-header">
+      <div class="header-content">
+        <div class="logo">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+          <h1>Shadow Tagger</h1>
+        </div>
+        <div class="extension-toggle">
+          <label class="toggle-switch">
+            <input type="checkbox" id="extensionToggle" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </header>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <div class="status-item">
+        <span class="status-label">Page:</span>
+        <span class="status-value" id="pageStatus">Ready</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">Elements:</span>
+        <span class="status-value" id="elementCount">0</span>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="popup-main">
+      <!-- Quick Actions -->
+      <section class="quick-actions">
+        <button class="action-btn primary" id="togglePicker">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+          Start Element Picker
+        </button>
+        <button class="action-btn secondary" id="clearResults">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+          </svg>
+          Clear Results
+        </button>
+      </section>
+
+      <!-- Analysis Results -->
+      <section class="results-section">
+        <div class="section-header">
+          <h2>Analysis Results</h2>
+          <button class="icon-btn" id="refreshResults">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="results-container" id="resultsContainer">
+          <div class="empty-state" id="emptyState">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" opacity="0.3">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.5 6L12 10.5 8.5 8 12 5.5 15.5 8zM12 13.5L8.5 16 12 18.5 15.5 16 12 13.5z"/>
+            </svg>
+            <p>No elements analyzed yet</p>
+            <p class="hint">Click "Start Element Picker" to begin</p>
+          </div>
+          
+          <div class="results-list" id="resultsList">
+            <!-- Results will be populated by JavaScript -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Current URL Pattern -->
+      <section class="url-pattern-section" id="urlPatternSection">
+        <div class="section-header">
+          <h2>URL Pattern</h2>
+          <button class="icon-btn" id="copyUrlPattern">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+            </svg>
+          </button>
+        </div>
+        <div class="url-pattern-display">
+          <code id="urlPatternDisplay">No pattern generated</code>
+        </div>
+      </section>
+    </main>
+
+    <!-- Settings -->
+    <section class="settings-section">
+      <details class="settings-details">
+        <summary class="settings-header">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+          </svg>
+          Settings
+        </summary>
+        <div class="settings-content">
+          <div class="setting-item">
+            <label class="setting-label">
+              <input type="checkbox" id="autoDetectShadowDOM" checked>
+              <span class="checkmark"></span>
+              Auto-detect Shadow DOM
+            </label>
+          </div>
+          <div class="setting-item">
+            <label class="setting-label">
+              <input type="checkbox" id="generateURLPatterns" checked>
+              <span class="checkmark"></span>
+              Generate URL patterns
+            </label>
+          </div>
+          <div class="setting-item">
+            <label class="setting-label">
+              <input type="checkbox" id="copyToClipboard" checked>
+              <span class="checkmark"></span>
+              Auto-copy to clipboard
+            </label>
+          </div>
+          <div class="setting-item">
+            <label class="setting-label">
+              <input type="checkbox" id="showPreview" checked>
+              <span class="checkmark"></span>
+              Show element preview
+            </label>
+          </div>
+          <div class="setting-item">
+            <label class="setting-label">
+              <input type="checkbox" id="highlightOnHover" checked>
+              <span class="checkmark"></span>
+              Highlight on hover
+            </label>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- Footer -->
+    <footer class="popup-footer">
+      <div class="footer-actions">
+        <button class="text-btn" id="exportData">Export Data</button>
+        <button class="text-btn" id="viewHelp">Help</button>
+      </div>
+      <div class="version-info">
+        <span id="versionNumber">v1.0.0</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Hidden elements for functionality -->
+  <input type="file" id="importFileInput" accept=".json" style="display: none;">
+  
+  <script src="popup.js"></script>
+</body>
+</html>
