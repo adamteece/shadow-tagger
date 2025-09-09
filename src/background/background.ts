@@ -94,6 +94,10 @@ class BackgroundService {
           await this.toggleExtension();
           return { enabled: this.state.isEnabled };
           
+        case 'CONTENT_SCRIPT_READY':
+          console.log('Content script ready for tab:', sender.tab?.id);
+          return { success: true };
+          
         default:
           console.warn('Unknown message type:', message.type);
           return { error: 'Unknown message type' };

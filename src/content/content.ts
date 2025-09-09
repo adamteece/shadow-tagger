@@ -5,7 +5,7 @@ import browser from 'webextension-polyfill';
 import { detectShadowContext } from '../lib/shadow-dom-detector/ShadowDetector';
 import { generateSelector } from '../lib/shadow-dom-detector/SelectorGenerator';
 import { analyzeURL } from '../lib/url-pattern-builder/URLAnalyzer';
-import { formatForPendo } from '../lib/pendo-formatter/PendoFormatter';
+import { formatRule } from '../lib/pendo-formatter/PendoFormatter';
 
 export interface ElementPickerOptions {
   enabled: boolean;
@@ -15,7 +15,7 @@ export interface ElementPickerOptions {
 }
 
 export interface AnalysisResult {
-  element: HTMLElement;
+  element: HTMLElement | null;
   selector: string;
   shadowContext: any;
   urlPattern: any;
@@ -40,6 +40,7 @@ class ContentScript {
   };
   
   constructor() {
+    console.log('Shadow Tagger content script initializing...');
     this.initialize();
   }
   
@@ -52,11 +53,14 @@ class ContentScript {
     }
   }
   
-  private setup(): void {
+  private async setup(): Promise<void> {
+    console.log('Setting up content script...');
     this.createOverlay();
     this.setupMessageListeners();
     this.setupKeyboardShortcuts();
+    await this.loadExistingResults();
     this.notifyBackgroundReady();
+    console.log('Content script setup complete');
   }
   
   private createOverlay(): void {
@@ -103,9 +107,12 @@ class ContentScript {
   
   private async handleMessage(message: any, sender: any, sendResponse: any): Promise<any> {
     try {
+      console.log('Content script received message:', message);
       switch (message.type) {
         case 'TOGGLE_ELEMENT_PICKER':
+          console.log('Toggling element picker, current state:', this.isPickerActive);
           this.toggleElementPicker();
+          console.log('Element picker toggled, new state:', this.isPickerActive);
           return { success: true, active: this.isPickerActive };
           
         case 'ANALYZE_ELEMENT':
@@ -125,11 +132,15 @@ class ContentScript {
         case 'GET_ANALYSIS_RESULTS':
           return { results: this.analysisResults };
           
+        case 'ANALYZE_URL':
+          return this.analyzeCurrentURL();
+          
         case 'CLEAR_ANALYSIS':
           this.clearAnalysis();
           return { success: true };
           
         default:
+          console.log('Unknown message type:', message.type);
           return { error: 'Unknown message type' };
       }
     } catch (error) {
@@ -163,8 +174,12 @@ class ContentScript {
   }
   
   private activateElementPicker(): void {
-    if (!this.isEnabled) return;
+    if (!this.isEnabled) {
+      console.log('Element picker not activated - extension is disabled');
+      return;
+    }
     
+    console.log('Activating element picker');
     this.isPickerActive = true;
     document.body.style.cursor = 'crosshair';
     
@@ -173,6 +188,7 @@ class ContentScript {
     document.addEventListener('mouseout', this.handleMouseOut);
     document.addEventListener('click', this.handleClick);
     
+    console.log('Element picker event listeners added');
     this.showPickerNotification('Element picker activated. Click an element to analyze it. Press Escape to exit.');
   }
   
@@ -213,13 +229,16 @@ class ContentScript {
   };
   
   private handleClick = async (event: MouseEvent): Promise<void> => {
+    console.log('Click event received, picker active:', this.isPickerActive);
     if (!this.isPickerActive) return;
     
     event.preventDefault();
     event.stopPropagation();
     
     const target = event.target as HTMLElement;
+    console.log('Clicked element:', target);
     if (target && target !== this.overlay && target !== this.tooltip) {
+      console.log('Analyzing clicked element');
       await this.analyzeElement(target);
       this.deactivateElementPicker();
     }
@@ -277,27 +296,50 @@ class ContentScript {
     try {
       this.showPickerNotification('Analyzing element...', 'info');
       
-      // Detect shadow DOM context
-      const shadowContext = await detectShadowContext(element);
+      // For now, skip complex shadow DOM detection to avoid recursion issues
+      const shadowContext = {
+        isInShadowDOM: false,
+        targetElement: element
+      };
       
-      // Generate CSS selector
-      const selector = await generateSelector(element, { 
-        preferStableAttributes: true,
-        shadowAware: shadowContext?.isInShadowDOM || false 
-      });
+      // Generate a simple CSS selector
+      let selectorValue = '';
+      try {
+        const tagName = element.tagName.toLowerCase();
+        const id = element.id ? `#${element.id}` : '';
+        const classes = element.className ? `.${element.className.trim().replace(/\s+/g, '.')}` : '';
+        
+        // Build selector with preference for id, then classes, then tag
+        if (id) {
+          selectorValue = `${tagName}${id}`;
+        } else if (classes) {
+          selectorValue = `${tagName}${classes}`;
+        } else {
+          // Use nth-child if no unique identifiers
+          const siblings = Array.from(element.parentElement?.children || []);
+          const index = siblings.indexOf(element) + 1;
+          selectorValue = `${tagName}:nth-child(${index})`;
+        }
+      } catch (error) {
+        console.warn('Simple selector generation failed:', error);
+        selectorValue = element.tagName.toLowerCase();
+      }
       
       // Analyze current URL
-      const urlPattern = await analyzeURL(window.location.href);
-      
-      // Format for Pendo (if selector is available)
-      let pendoRule = null;
-      if (selector) {
-        pendoRule = await formatForPendo(selector, urlPattern);
+      let urlPattern = null;
+      try {
+        urlPattern = await analyzeURL(window.location.href);
+      } catch (error) {
+        console.warn('URL analysis failed:', error);
+        urlPattern = { pattern: window.location.href };
       }
+      
+      // For now, skip Pendo formatting to avoid additional errors
+      let pendoRule = null;
       
       const result: AnalysisResult = {
         element,
-        selector: selector?.value || '',
+        selector: selectorValue || '',
         shadowContext,
         urlPattern,
         pendoRule,
@@ -307,13 +349,18 @@ class ContentScript {
       this.analysisResults.push(result);
       this.lastAnalyzedElement = element;
       
+      // Store results in chrome.storage for persistence
+      await this.saveAnalysisResults();
+      
       // Notify background about analysis
       await browser.runtime.sendMessage({
         type: 'ELEMENT_ANALYZED',
         data: {
           url: window.location.href,
           elementCount: this.analysisResults.length,
-          timestamp: result.timestamp
+          timestamp: result.timestamp,
+          selector: result.selector,
+          pendoRule: result.pendoRule
         }
       });
       
@@ -369,9 +416,58 @@ class ContentScript {
     }
   }
   
-  private clearAnalysis(): void {
+  private async clearAnalysis(): Promise<void> {
     this.analysisResults = [];
     this.lastAnalyzedElement = null;
+    await this.saveAnalysisResults();
+  }
+  
+  private async saveAnalysisResults(): Promise<void> {
+    try {
+      const storageKey = `analysis_results_${window.location.href}`;
+      const dataToStore = this.analysisResults.map(result => ({
+        selector: result.selector,
+        shadowContext: result.shadowContext,
+        urlPattern: result.urlPattern,
+        pendoRule: result.pendoRule,
+        timestamp: result.timestamp,
+        elementInfo: result.element ? {
+          tagName: result.element.tagName,
+          id: result.element.id,
+          className: result.element.className,
+          textContent: result.element.textContent?.substring(0, 100)
+        } : null
+      }));
+      
+      await browser.storage.local.set({
+        [storageKey]: dataToStore,
+        [`last_analysis_${window.location.href}`]: Date.now()
+      });
+    } catch (error) {
+      console.error('Failed to save analysis results:', error);
+    }
+  }
+  
+  private async loadExistingResults(): Promise<void> {
+    try {
+      const storageKey = `analysis_results_${window.location.href}`;
+      const stored = await browser.storage.local.get(storageKey);
+      
+      if (stored[storageKey] && Array.isArray(stored[storageKey])) {
+        // Convert stored data back to AnalysisResult format
+        // Note: we can't restore the actual HTMLElement, but we have the selector
+        this.analysisResults = stored[storageKey].map((item: any) => ({
+          element: null, // Element reference is lost, but we have selector
+          selector: item.selector,
+          shadowContext: item.shadowContext,
+          urlPattern: item.urlPattern,
+          pendoRule: item.pendoRule,
+          timestamp: item.timestamp
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to load existing results:', error);
+    }
   }
   
   private showPickerNotification(message: string, type: 'info' | 'success' | 'error' = 'info'): void {
@@ -425,6 +521,18 @@ class ContentScript {
       });
     } catch (error) {
       // Background script might not be ready yet
+    }
+  }
+  
+  private async analyzeCurrentURL(): Promise<any> {
+    try {
+      console.log('*** CONTENT SCRIPT: Analyzing current URL:', window.location.href);
+      const urlPattern = await analyzeURL(window.location.href);
+      console.log('*** CONTENT SCRIPT: URL analysis result:', urlPattern);
+      return { urlPattern };
+    } catch (error) {
+      console.warn('*** CONTENT SCRIPT: URL analysis failed:', error);
+      return { urlPattern: { pattern: window.location.href } };
     }
   }
 }

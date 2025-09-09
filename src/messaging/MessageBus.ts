@@ -8,6 +8,7 @@ export enum MessageType {
   CONTENT_SCRIPT_READY = 'CONTENT_SCRIPT_READY',
   TOGGLE_ELEMENT_PICKER = 'TOGGLE_ELEMENT_PICKER',
   ANALYZE_ELEMENT = 'ANALYZE_ELEMENT',
+  ANALYZE_URL = 'ANALYZE_URL',
   ELEMENT_ANALYZED = 'ELEMENT_ANALYZED',
   GET_PAGE_INFO = 'GET_PAGE_INFO',
   CLEAR_ANALYSIS = 'CLEAR_ANALYSIS',
@@ -268,6 +269,15 @@ export class MessageBus {
   async clearAnalysis(): Promise<void> {
     await this.sendToActiveTab({
       type: MessageType.CLEAR_ANALYSIS
+    });
+  }
+  
+  /**
+   * Analyze current page URL to generate patterns
+   */
+  async analyzeCurrentPageURL(): Promise<any> {
+    return this.sendToActiveTab({
+      type: MessageType.ANALYZE_URL
     });
   }
   

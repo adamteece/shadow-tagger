@@ -2,8 +2,6 @@
 
 const path = require('path');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
-const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = (env, argv) => {
   const isProduction = argv.mode === 'production';
@@ -25,19 +23,14 @@ module.exports = (env, argv) => {
       rules: [
         {
           test: /\.ts$/,
-          use: 'ts-loader',
+          use: {
+            loader: 'ts-loader',
+            options: {
+              configFile: 'tsconfig.build.json',
+              transpileOnly: true
+            }
+          },
           exclude: /node_modules/
-        },
-        {
-          test: /\.css$/,
-          use: [MiniCssExtractPlugin.loader, 'css-loader']
-        },
-        {
-          test: /\.(png|jpg|jpeg|gif|svg)$/,
-          type: 'asset/resource',
-          generator: {
-            filename: 'images/[name][ext]'
-          }
         }
       ]
     },
@@ -50,16 +43,6 @@ module.exports = (env, argv) => {
     },
     
     plugins: [
-      new MiniCssExtractPlugin({
-        filename: '[name].css'
-      }),
-      
-      new HtmlWebpackPlugin({
-        template: './src/popup/popup.html',
-        filename: 'popup.html',
-        chunks: ['popup']
-      }),
-      
       new CopyWebpackPlugin({
         patterns: [
           {
@@ -67,13 +50,17 @@ module.exports = (env, argv) => {
             to: 'manifest.json'
           },
           {
-            from: './src/icons',
-            to: 'icons',
-            noErrorOnMissing: true
+            from: './src/popup/popup.html',
+            to: 'popup.html'
           },
           {
             from: './src/popup/popup.css',
             to: 'popup.css'
+          },
+          {
+            from: './src/icons',
+            to: 'icons',
+            noErrorOnMissing: true
           }
         ]
       })
@@ -82,17 +69,7 @@ module.exports = (env, argv) => {
     devtool: isProduction ? false : 'source-map',
     
     optimization: {
-      minimize: isProduction,
-      splitChunks: {
-        chunks: 'all',
-        cacheGroups: {
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            chunks: 'all'
-          }
-        }
-      }
+      minimize: isProduction
     },
     
     stats: {

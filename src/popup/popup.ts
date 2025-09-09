@@ -131,27 +131,146 @@ class PopupController {
   
   private async loadState(): Promise<void> {
     try {
-      // Get extension state from background
-      const extensionState = await messageBus.getExtensionState();
-      this.state.isExtensionEnabled = extensionState.state.isEnabled;
-      this.state.settings = { ...this.state.settings, ...extensionState.state.settings };
+      console.log('Popup loading state...');
       
-      // Get current page info
-      const pageInfo = await messageBus.getPageInfo();
-      this.state.currentPage = pageInfo.data;
-      this.state.isPickerActive = pageInfo.data.isPickerActive;
+      // Get extension state from background with fallback
+      try {
+        const extensionState = await messageBus.getExtensionState();
+        console.log('Extension state response:', extensionState);
+        
+        if (extensionState && extensionState.state) {
+          this.state.isExtensionEnabled = extensionState.state.isEnabled;
+          this.state.settings = { ...this.state.settings, ...extensionState.state.settings };
+        } else {
+          console.log('Extension state missing, using defaults');
+          this.state.isExtensionEnabled = true; // Default to enabled
+        }
+      } catch (error) {
+        console.log('Failed to get extension state:', error);
+        this.state.isExtensionEnabled = true; // Default to enabled
+      }
+
+      // Get current page info with fallback
+      try {
+        const pageInfo = await messageBus.getPageInfo();
+        console.log('Page info response:', pageInfo);
+        
+        if (pageInfo && pageInfo.data) {
+          this.state.currentPage = pageInfo.data;
+          this.state.isPickerActive = pageInfo.data.isPickerActive;
+        } else {
+          console.log('Page info missing, using defaults');
+          this.state.currentPage = { url: '', title: '', elementCount: 0 };
+          this.state.isPickerActive = false;
+        }
+      } catch (error) {
+        console.log('Failed to get page info:', error);
+        this.state.currentPage = { url: '', title: '', elementCount: 0 };
+        this.state.isPickerActive = false;
+      }
+
+      // Get current tab to find URL
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      const currentTab = tabs[0];
       
-      // Get analysis results
-      const results = await messageBus.getAnalysisResults();
-      this.state.analysisResults = results.results || [];
-      
+      if (currentTab?.url) {
+        console.log('Loading analysis results for URL:', currentTab.url);
+        
+        // Generate URL pattern for current page
+        try {
+          console.log('*** STARTING AUTOMATIC URL PATTERN GENERATION ***');
+          console.log('Generating URL pattern for current page...');
+          const urlAnalysisResult = await messageBus.analyzeCurrentPageURL();
+          console.log('URL analysis result:', urlAnalysisResult);
+          console.log('URL analysis result type:', typeof urlAnalysisResult);
+          console.log('URL analysis result keys:', Object.keys(urlAnalysisResult || {}));
+          
+          if (urlAnalysisResult && urlAnalysisResult.urlPattern) {
+            console.log('urlPattern property:', urlAnalysisResult.urlPattern);
+            console.log('urlPattern type:', typeof urlAnalysisResult.urlPattern);
+            console.log('urlPattern keys:', Object.keys(urlAnalysisResult.urlPattern || {}));
+            
+            // Log all the properties to see what's available
+            const urlPatternObj = urlAnalysisResult.urlPattern;
+            console.log('urlPattern._generatedPattern:', urlPatternObj._generatedPattern);
+            console.log('urlPattern.pattern:', urlPatternObj.pattern);
+            console.log('urlPattern.generatedPattern:', urlPatternObj.generatedPattern);
+            console.log('urlPattern.volatileSegments:', urlPatternObj.volatileSegments);
+            console.log('urlPattern.matchType:', urlPatternObj.matchType);
+            
+            // Decide which pattern to use based on usefulness
+            let selectedPattern = '';
+            
+            if (typeof urlAnalysisResult.urlPattern === 'string') {
+              selectedPattern = urlAnalysisResult.urlPattern;
+              console.log('Set pattern from string:', selectedPattern);
+            } else if (urlAnalysisResult.urlPattern._generatedPattern) {
+              selectedPattern = urlAnalysisResult.urlPattern._generatedPattern;
+              console.log('Set pattern from ._generatedPattern property:', selectedPattern);
+            } else if (urlAnalysisResult.urlPattern.generatedPattern) {
+              selectedPattern = urlAnalysisResult.urlPattern.generatedPattern;
+              console.log('Set pattern from .generatedPattern property:', selectedPattern);
+            } else if (urlAnalysisResult.urlPattern.pattern) {
+              selectedPattern = urlAnalysisResult.urlPattern.pattern;
+              console.log('Set pattern from .pattern property:', selectedPattern);
+            }
+            
+            // Check if the generated pattern is too simplified (much shorter than original)
+            const originalUrl = currentTab.url;
+            const isOversimplified = selectedPattern && 
+              (originalUrl.length - selectedPattern.length) > 50 && // Much shorter
+              originalUrl.includes('#'); // Had hash parameters
+            
+            if (isOversimplified) {
+              console.log('Generated pattern seems oversimplified, using full URL');
+              console.log('Simplified pattern was:', selectedPattern);
+              this.state.urlPattern = originalUrl;
+            } else if (selectedPattern) {
+              this.state.urlPattern = selectedPattern;
+              console.log('Using generated pattern:', selectedPattern);
+            } else {
+              this.state.urlPattern = currentTab.url; // Fallback to current URL
+              console.log('Set pattern from currentTab.url fallback:', this.state.urlPattern);
+            }
+          } else {
+            this.state.urlPattern = currentTab.url; // Fallback to current URL
+            console.log('Set pattern from final fallback:', this.state.urlPattern);
+          }
+          console.log('Final state.urlPattern:', this.state.urlPattern);
+        } catch (error) {
+          console.log('Failed to analyze URL, using current URL as pattern:', error);
+          this.state.urlPattern = currentTab.url;
+        }
+        
+        // Load analysis results from storage for current URL
+        const storageKey = `analysis_results_${currentTab.url}`;
+        const stored = await browser.storage.local.get(storageKey);
+        
+        console.log('Stored data:', stored);
+        
+        if (stored[storageKey] && Array.isArray(stored[storageKey])) {
+          this.state.analysisResults = stored[storageKey];
+          this.state.currentPage.elementCount = stored[storageKey].length;
+          console.log('Loaded analysis results:', this.state.analysisResults);
+        } else {
+          console.log('No stored results found, trying content script...');
+          // Fallback: try to get from content script
+          try {
+            const results = await messageBus.getAnalysisResults();
+            this.state.analysisResults = results.results || [];
+            console.log('Content script results:', this.state.analysisResults);
+          } catch (error) {
+            console.log('Content script fallback failed:', error);
+            this.state.analysisResults = [];
+          }
+        }
+      }
+
     } catch (error) {
       console.error('Failed to load state:', error);
       // Continue with default state
     }
-  }
-  
-  private updateUI(): void {
+  }  private updateUI(): void {
     // Update extension toggle
     if (this.elements.extensionToggle) {
       this.elements.extensionToggle.checked = this.state.isExtensionEnabled;
@@ -197,18 +316,23 @@ class PopupController {
   
   private updateResultsDisplay(): void {
     const hasResults = this.state.analysisResults.length > 0;
+    console.log('Updating results display, hasResults:', hasResults, 'analysisResults:', this.state.analysisResults);
     
     if (this.elements.emptyState) {
       this.elements.emptyState.style.display = hasResults ? 'none' : 'flex';
+      console.log('Empty state display:', this.elements.emptyState.style.display);
     }
     
     if (this.elements.resultsList) {
       this.elements.resultsList.style.display = hasResults ? 'block' : 'none';
+      console.log('Results list display:', this.elements.resultsList.style.display);
       
       if (hasResults) {
-        this.elements.resultsList.innerHTML = this.state.analysisResults
+        const htmlContent = this.state.analysisResults
           .map((result, index) => this.createResultItemHTML(result, index))
           .join('');
+        console.log('Generated HTML content:', htmlContent);
+        this.elements.resultsList.innerHTML = htmlContent;
         
         // Add event listeners to result items
         this.elements.resultsList.querySelectorAll('.result-copy-btn').forEach((btn, index) => {
@@ -219,6 +343,8 @@ class PopupController {
           btn.addEventListener('click', () => this.handleHighlightElement(index));
         });
       }
+    } else {
+      console.log('Results list element not found!');
     }
   }
   
@@ -251,13 +377,44 @@ class PopupController {
   }
   
   private updateUrlPatternDisplay(): void {
+    console.log('*** UPDATE URL PATTERN DISPLAY called ***');
+    console.log('Current state.urlPattern:', this.state.urlPattern);
+    console.log('Analysis results length:', this.state.analysisResults.length);
+    
+    // Use direct state.urlPattern if available, otherwise extract from analysis results
+    let pattern = 'No pattern generated';
+    
+    if (this.state.urlPattern) {
+      // Use the directly set URL pattern (from automatic analysis)
+      pattern = this.state.urlPattern;
+      console.log('Using direct state.urlPattern:', pattern);
+    } else if (this.state.analysisResults.length > 0) {
+      // Fallback: extract from latest analysis result (from element picking)
+      const latestResult = this.state.analysisResults[this.state.analysisResults.length - 1];
+      console.log('Latest analysis result:', latestResult);
+      if (latestResult.urlPattern) {
+        // Check if urlPattern has a pattern property or is the pattern itself
+        if (typeof latestResult.urlPattern === 'string') {
+          pattern = latestResult.urlPattern;
+        } else if (latestResult.urlPattern.pattern) {
+          pattern = latestResult.urlPattern.pattern;
+        } else if (latestResult.urlPattern._generatedPattern) {
+          pattern = latestResult.urlPattern._generatedPattern;
+        }
+        console.log('Extracted pattern from analysis result:', pattern);
+      }
+    }
+    
+    console.log('Final pattern to display:', pattern);
+    
     if (this.elements.urlPatternDisplay) {
-      const pattern = this.state.urlPattern || 'No pattern generated';
       this.elements.urlPatternDisplay.textContent = pattern;
+      console.log('Set urlPatternDisplay textContent to:', pattern);
     }
     
     if (this.elements.copyUrlPattern) {
-      this.elements.copyUrlPattern.disabled = !this.state.urlPattern;
+      this.elements.copyUrlPattern.disabled = pattern === 'No pattern generated';
+      console.log('Set copy button disabled to:', pattern === 'No pattern generated');
     }
   }
   
@@ -294,21 +451,32 @@ class PopupController {
   
   private async handleTogglePicker(): Promise<void> {
     try {
+      console.log('Popup: handleTogglePicker called, current state:', this.state.isPickerActive);
       this.setButtonLoading(this.elements.togglePicker, true);
       
+      console.log('Popup: sending toggle element picker message...');
       const result = await messageBus.toggleElementPicker();
-      this.state.isPickerActive = result.active;
+      console.log('Popup: received toggle result:', result);
       
-      this.updateUI();
-      this.showSuccess(result.active ? 'Element picker activated' : 'Element picker deactivated');
-      
-      // Close popup if picker is activated
-      if (result.active) {
-        window.close();
+      if (result && typeof result.active === 'boolean') {
+        this.state.isPickerActive = result.active;
+        console.log('Popup: updated picker state to:', this.state.isPickerActive);
+        
+        this.updateUI();
+        this.showSuccess(result.active ? 'Element picker activated' : 'Element picker deactivated');
+        
+        // Close popup if picker is activated
+        if (result.active) {
+          console.log('Popup: closing window since picker is active');
+          setTimeout(() => window.close(), 100); // Small delay to ensure message is sent
+        }
+      } else {
+        console.error('Popup: Invalid result from toggleElementPicker:', result);
+        this.showError('Failed to toggle element picker');
       }
       
     } catch (error) {
-      console.error('Failed to toggle element picker:', error);
+      console.error('Popup: Failed to toggle element picker:', error);
       this.showError('Failed to toggle element picker');
     } finally {
       this.setButtonLoading(this.elements.togglePicker, false);
