@@ -77,7 +77,11 @@ export class ShadowContext {
     return this._hostElement;
   }
 
-  get shadowPath(): ShadowPath[] {
+  get shadowPath(): ShadowRoot[] {
+    return this._shadowPath.map(path => path.root);
+  }
+
+  get shadowPathDetailed(): ShadowPath[] {
     return [...this._shadowPath];
   }
 
@@ -149,7 +153,7 @@ export class ShadowContext {
     }
     
     return this._shadowPath.every((path, index) => 
-      path.root === otherContext.shadowPath[index]?.root
+      path.root === otherContext._shadowPath[index]?.root
     );
   }
 

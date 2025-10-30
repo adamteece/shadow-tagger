@@ -3,6 +3,7 @@
 
 import browser from 'webextension-polyfill';
 import { messageBus, MessageType } from '../messaging/MessageBus';
+import ClipboardUtils from '../utils/ClipboardUtils';
 
 interface PopupState {
   isExtensionEnabled: boolean;
@@ -26,8 +27,14 @@ interface PopupState {
 class PopupController {
   private state: PopupState;
   private elements: { [key: string]: HTMLElement } = {};
+  private clipboard: ClipboardUtils;
   
   constructor() {
+    this.clipboard = new ClipboardUtils({
+      showNotification: false, // We'll handle notifications ourselves
+      formatType: 'text',
+      includeMetadata: false
+    });
     this.state = {
       isExtensionEnabled: true,
       isPickerActive: false,
@@ -90,6 +97,22 @@ class PopupController {
       versionNumber: document.getElementById('versionNumber') as HTMLElement,
       importFileInput: document.getElementById('importFileInput') as HTMLInputElement,
       
+      // Tabs
+      tabButtons: Array.from(document.querySelectorAll('.tab-btn')),
+      featuresTab: document.getElementById('featuresTab') as HTMLElement,
+      pagesTab: document.getElementById('pagesTab') as HTMLElement,
+      
+      // Page Rules tab elements
+      currentUrlDisplay: document.getElementById('currentUrlDisplay') as HTMLElement,
+      refreshUrl: document.getElementById('refreshUrl') as HTMLButtonElement,
+      analyzeUrl: document.getElementById('analyzeUrl') as HTMLButtonElement,
+      urlSegmentsContainer: document.getElementById('urlSegmentsContainer') as HTMLElement,
+      segmentsList: document.getElementById('segmentsList') as HTMLElement,
+      patternOutput: document.getElementById('patternOutput') as HTMLElement,
+      copyPagePattern: document.getElementById('copyPagePattern') as HTMLButtonElement,
+      matchType: document.getElementById('matchType') as HTMLElement,
+      wildcardCount: document.getElementById('wildcardCount') as HTMLElement,
+      
       // Settings
       autoDetectShadowDOM: document.getElementById('autoDetectShadowDOM') as HTMLInputElement,
       generateURLPatterns: document.getElementById('generateURLPatterns') as HTMLInputElement,
@@ -100,6 +123,16 @@ class PopupController {
   }
   
   private setupEventListeners(): void {
+    // Tab switching
+    this.elements.tabButtons?.forEach((btn: Element) => {
+      btn.addEventListener('click', this.handleTabSwitch.bind(this));
+    });
+    
+    // Page Rules tab actions
+    this.elements.refreshUrl?.addEventListener('click', this.handleRefreshUrl.bind(this));
+    this.elements.analyzeUrl?.addEventListener('click', this.handleAnalyzeUrl.bind(this));
+    this.elements.copyPagePattern?.addEventListener('click', this.handleCopyPagePattern.bind(this));
+    
     // Extension toggle
     this.elements.extensionToggle?.addEventListener('change', this.handleExtensionToggle.bind(this));
     
@@ -436,6 +469,271 @@ class PopupController {
     }
   }
   
+  // Tab Navigation Handlers
+  private handleTabSwitch(event: Event): void {
+    const button = event.currentTarget as HTMLElement;
+    const tabName = button.dataset.tab;
+    
+    if (!tabName) return;
+    
+    // Update tab buttons
+    this.elements.tabButtons?.forEach((btn: Element) => {
+      btn.classList.remove('active');
+    });
+    button.classList.add('active');
+    
+    // Update tab content
+    if (this.elements.featuresTab) {
+      this.elements.featuresTab.classList.remove('active');
+    }
+    if (this.elements.pagesTab) {
+      this.elements.pagesTab.classList.remove('active');
+    }
+    
+    if (tabName === 'features' && this.elements.featuresTab) {
+      this.elements.featuresTab.classList.add('active');
+    } else if (tabName === 'pages' && this.elements.pagesTab) {
+      this.elements.pagesTab.classList.add('active');
+      // Load current URL when switching to page rules tab
+      this.loadCurrentUrl();
+    }
+  }
+  
+  // Page Rules Tab Handlers
+  private async loadCurrentUrl(): Promise<void> {
+    try {
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      if (tabs[0]?.url) {
+        const url = tabs[0].url;
+        this.state.currentPage.url = url;
+        
+        if (this.elements.currentUrlDisplay) {
+          this.elements.currentUrlDisplay.textContent = url;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load current URL:', error);
+      if (this.elements.currentUrlDisplay) {
+        this.elements.currentUrlDisplay.textContent = 'Unable to access URL';
+      }
+    }
+  }
+  
+  private async handleRefreshUrl(): Promise<void> {
+    await this.loadCurrentUrl();
+    this.showSuccess('URL refreshed');
+  }
+  
+  private async handleAnalyzeUrl(): Promise<void> {
+    try {
+      const url = this.state.currentPage.url;
+      if (!url) {
+        this.showError('No URL to analyze');
+        return;
+      }
+      
+      this.setButtonLoading(this.elements.analyzeUrl, true);
+      
+      // Import URLAnalyzer dynamically
+      const { analyzeURL } = await import('../lib/url-pattern-builder/URLAnalyzer');
+      const urlPattern = await analyzeURL(url);
+      
+      if (urlPattern) {
+        this.renderUrlSegments(urlPattern);
+        this.updatePatternOutput(urlPattern);
+      }
+      
+    } catch (error) {
+      console.error('Failed to analyze URL:', error);
+      this.showError('Failed to analyze URL');
+    } finally {
+      this.setButtonLoading(this.elements.analyzeUrl, false);
+    }
+  }
+  
+  private renderUrlSegments(urlPattern: any): void {
+    if (!this.elements.urlSegmentsContainer || !this.elements.segmentsList) return;
+    
+    // Hide empty state
+    const emptyState = this.elements.urlSegmentsContainer.querySelector('.empty-state');
+    if (emptyState) {
+      (emptyState as HTMLElement).style.display = 'none';
+    }
+    
+    // Show segments list
+    this.elements.segmentsList.style.display = 'flex';
+    this.elements.segmentsList.innerHTML = '';
+    
+    // Parse URL to get all segments
+    try {
+      const urlObj = new URL(urlPattern.originalURL);
+      const pathSegments = urlObj.pathname.split('/').filter(Boolean);
+      
+      pathSegments.forEach((segment, index) => {
+        const volatileSegment = urlPattern.volatileSegments.find((vs: any) => vs.position === index);
+        const isVolatile = !!volatileSegment;
+        
+        const segmentEl = document.createElement('div');
+        segmentEl.className = 'segment-item' + (isVolatile ? ' volatile' : '');
+        segmentEl.dataset.index = index.toString();
+        
+        segmentEl.innerHTML = `
+          <div class="segment-header">
+            <div class="segment-type">
+              <span class="segment-type-badge ${isVolatile ? '' : 'stable'}">
+                ${isVolatile ? volatileSegment.type : 'stable'}
+              </span>
+              <span>Segment ${index + 1}</span>
+            </div>
+          </div>
+          <div class="segment-value">/${segment}</div>
+          <div class="segment-controls">
+            <label class="segment-toggle ${!isVolatile ? 'active' : ''}">
+              <input type="radio" name="segment-${index}" value="include" ${!isVolatile ? 'checked' : ''}>
+              Include
+            </label>
+            <label class="segment-toggle ${isVolatile ? 'active' : ''}">
+              <input type="radio" name="segment-${index}" value="wildcard" ${isVolatile ? 'checked' : ''}>
+              Wildcard (*)
+            </label>
+            <label class="segment-toggle">
+              <input type="radio" name="segment-${index}" value="exclude">
+              Exclude
+            </label>
+          </div>
+        `;
+        
+        // Add change listeners
+        const radioButtons = segmentEl.querySelectorAll('input[type="radio"]');
+        radioButtons.forEach(radio => {
+          radio.addEventListener('change', () => this.handleSegmentToggle(index));
+        });
+        
+        this.elements.segmentsList!.appendChild(segmentEl);
+      });
+      
+    } catch (error) {
+      console.error('Failed to render URL segments:', error);
+    }
+  }
+  
+  private handleSegmentToggle(index: number): void {
+    // Rebuild pattern when segment selection changes
+    this.rebuildPatternFromSegments();
+  }
+  
+  private async rebuildPatternFromSegments(): Promise<void> {
+    try {
+      const url = this.state.currentPage.url;
+      if (!url) return;
+      
+      const urlObj = new URL(url);
+      const pathSegments = urlObj.pathname.split('/').filter(Boolean);
+      
+      // Build pattern from current segment selections
+      const patternSegments: string[] = [];
+      let wildcardCount = 0;
+      
+      pathSegments.forEach((segment, index) => {
+        const segmentItem = this.elements.segmentsList?.querySelector(`[data-index="${index}"]`);
+        if (!segmentItem) return;
+        
+        const selectedRadio = segmentItem.querySelector('input[type="radio"]:checked') as HTMLInputElement;
+        const value = selectedRadio?.value;
+        
+        if (value === 'wildcard') {
+          patternSegments.push('*');
+          wildcardCount++;
+        } else if (value === 'include') {
+          patternSegments.push(segment);
+        }
+        // 'exclude' means don't add to pattern (truncate here)
+      });
+      
+      // Build final pattern
+      const pattern = `${urlObj.origin}/${patternSegments.join('/')}`;
+      
+      // Update output
+      if (this.elements.patternOutput) {
+        this.elements.patternOutput.textContent = pattern;
+      }
+      
+      if (this.elements.matchType) {
+        this.elements.matchType.textContent = wildcardCount > 0 ? 'wildcard' : 'exact';
+      }
+      
+      if (this.elements.wildcardCount) {
+        this.elements.wildcardCount.textContent = wildcardCount.toString();
+      }
+      
+    } catch (error) {
+      console.error('Failed to rebuild pattern:', error);
+    }
+  }
+  
+  private async updatePatternOutput(urlPattern: any): Promise<void> {
+    try {
+      // Import PendoFormatter dynamically
+      const { formatForPendo } = await import('../lib/pendo-formatter/PendoFormatter');
+      const pendoRule = formatForPendo(urlPattern, 'url');
+      
+      if (pendoRule && this.elements.patternOutput) {
+        this.elements.patternOutput.textContent = pendoRule.urlPattern || pendoRule.copyableRule;
+      }
+      
+      if (this.elements.matchType) {
+        this.elements.matchType.textContent = urlPattern.matchType || 'wildcard';
+      }
+      
+      if (this.elements.wildcardCount) {
+        this.elements.wildcardCount.textContent = urlPattern.volatileSegments?.length?.toString() || '0';
+      }
+      
+    } catch (error) {
+      console.error('Failed to update pattern output:', error);
+    }
+  }
+  
+  private async handleCopyPagePattern(): Promise<void> {
+    try {
+      const pattern = this.elements.patternOutput?.textContent;
+      if (!pattern || pattern === 'No pattern generated') {
+        this.showError('No pattern to copy');
+        return;
+      }
+      
+      // Use ClipboardUtils for better cross-browser support
+      const result = await this.clipboard.copyText(pattern);
+      
+      if (result.success) {
+        this.showSuccess(`✓ Pattern copied! (${result.method})`);
+        
+        // Visual feedback on button
+        if (this.elements.copyPagePattern) {
+          const originalHTML = this.elements.copyPagePattern.innerHTML;
+          this.elements.copyPagePattern.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color: #28a745;">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+          `;
+          this.elements.copyPagePattern.classList.add('success');
+          
+          setTimeout(() => {
+            if (this.elements.copyPagePattern) {
+              this.elements.copyPagePattern.innerHTML = originalHTML;
+              this.elements.copyPagePattern.classList.remove('success');
+            }
+          }, 1500);
+        }
+      } else {
+        this.showError(`Copy failed: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Copy pattern error:', error);
+      this.showError('Failed to copy pattern');
+    }
+  }
+  
   private async handleExtensionToggle(): Promise<void> {
     try {
       const result = await messageBus.toggleExtension();
@@ -516,9 +814,35 @@ class PopupController {
   private async handleCopySelector(index: number): Promise<void> {
     try {
       const result = this.state.analysisResults[index];
-      if (result?.selector) {
-        await navigator.clipboard.writeText(result.selector);
-        this.showSuccess('Selector copied to clipboard');
+      if (!result?.selector) {
+        this.showError('No selector available');
+        return;
+      }
+      
+      // Copy selector using ClipboardUtils
+      const copyResult = await this.clipboard.copyText(result.selector);
+      
+      if (copyResult.success) {
+        this.showSuccess(`✓ Selector copied! (${copyResult.method})`);
+        
+        // Visual feedback on the button
+        const button = document.querySelectorAll('.result-copy-btn')[index] as HTMLElement;
+        if (button) {
+          const originalHTML = button.innerHTML;
+          button.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color: #28a745;">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+          `;
+          button.style.background = '#d4edda';
+          
+          setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.style.background = '';
+          }, 1500);
+        }
+      } else {
+        this.showError(`Copy failed: ${copyResult.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Failed to copy selector:', error);
@@ -538,12 +862,20 @@ class PopupController {
   
   private async handleCopyUrlPattern(): Promise<void> {
     try {
-      if (this.state.urlPattern) {
-        await navigator.clipboard.writeText(this.state.urlPattern);
-        this.showSuccess('URL pattern copied to clipboard');
+      if (!this.state.urlPattern) {
+        this.showError('No URL pattern available');
+        return;
+      }
+      
+      const result = await this.clipboard.copyText(this.state.urlPattern);
+      
+      if (result.success) {
+        this.showSuccess(`✓ URL pattern copied! (${result.method})`);
+      } else {
+        this.showError(`Copy failed: ${result.error || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Failed to copy URL pattern:', error);
+      console.error('Copy error:', error);
       this.showError('Failed to copy URL pattern');
     }
   }
@@ -615,4 +947,5 @@ document.addEventListener('DOMContentLoaded', () => {
   new PopupController();
 });
 
+export { PopupController };
 export default PopupController;

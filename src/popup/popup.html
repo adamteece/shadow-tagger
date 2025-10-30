@@ -40,50 +40,161 @@
 
     <!-- Main Content -->
     <main class="popup-main">
-      <!-- Quick Actions -->
-      <section class="quick-actions">
-        <button class="action-btn primary" id="togglePicker">
+      <!-- Tabs Navigation -->
+      <nav class="tabs-nav">
+        <button class="tab-btn active" data-tab="features">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
           </svg>
-          Start Element Picker
+          Features
         </button>
-        <button class="action-btn secondary" id="clearResults">
+        <button class="tab-btn" data-tab="pages">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>
           </svg>
-          Clear Results
+          Page Rules
         </button>
-      </section>
+      </nav>
 
-      <!-- Analysis Results -->
-      <section class="results-section">
-        <div class="section-header">
-          <h2>Analysis Results</h2>
-          <button class="icon-btn" id="refreshResults">
+      <!-- Features Tab -->
+      <div class="tab-content active" id="featuresTab">
+        <!-- Quick Actions -->
+        <section class="quick-actions">
+          <button class="action-btn primary" id="togglePicker">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
             </svg>
+            Start Element Picker
           </button>
-        </div>
-        
-        <div class="results-container" id="resultsContainer">
-          <div class="empty-state" id="emptyState">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" opacity="0.3">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.5 6L12 10.5 8.5 8 12 5.5 15.5 8zM12 13.5L8.5 16 12 18.5 15.5 16 12 13.5z"/>
+          <button class="action-btn secondary" id="clearResults">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
             </svg>
-            <p>No elements analyzed yet</p>
-            <p class="hint">Click "Start Element Picker" to begin</p>
+            Clear Results
+          </button>
+        </section>
+
+        <!-- Analysis Results -->
+        <section class="results-section">
+          <div class="section-header">
+            <h2>Analysis Results</h2>
+            <button class="icon-btn" id="refreshResults">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+              </svg>
+            </button>
           </div>
           
-          <div class="results-list" id="resultsList">
-            <!-- Results will be populated by JavaScript -->
+          <div class="results-container" id="resultsContainer">
+            <div class="empty-state" id="emptyState">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" opacity="0.3">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.5 6L12 10.5 8.5 8 12 5.5 15.5 8zM12 13.5L8.5 16 12 18.5 15.5 16 12 13.5z"/>
+              </svg>
+              <p>No elements analyzed yet</p>
+              <p class="hint">Click "Start Element Picker" to begin</p>
+            </div>
+            
+            <div class="results-list" id="resultsList">
+              <!-- Results will be populated by JavaScript -->
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <!-- Current URL Pattern -->
-      <section class="url-pattern-section" id="urlPatternSection">
+      <!-- Page Rules Tab -->
+      <div class="tab-content" id="pagesTab">
+        <!-- Current URL Display -->
+        <section class="current-url-section">
+          <div class="section-header">
+            <h2>Current Page URL</h2>
+            <button class="icon-btn" id="refreshUrl" title="Refresh URL">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+              </svg>
+            </button>
+          </div>
+          <div class="url-display">
+            <code id="currentUrlDisplay">Loading...</code>
+          </div>
+        </section>
+
+        <!-- URL Segments Builder -->
+        <section class="url-builder-section">
+          <div class="section-header">
+            <h2>URL Segments</h2>
+            <button class="icon-btn" id="analyzeUrl" title="Analyze URL">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+              </svg>
+            </button>
+          </div>
+          
+          <div class="url-segments-container" id="urlSegmentsContainer">
+            <div class="empty-state">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" opacity="0.3">
+                <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>
+              </svg>
+              <p>No URL analyzed yet</p>
+              <p class="hint">Click "Analyze URL" to extract segments</p>
+            </div>
+            
+            <div class="segments-list" id="segmentsList">
+              <!-- Segments will be populated by JavaScript -->
+            </div>
+          </div>
+        </section>
+
+        <!-- Generated Pattern -->
+        <section class="pattern-output-section">
+          <div class="section-header">
+            <h2>Pendo Page Rule</h2>
+            <button class="icon-btn" id="copyPagePattern" title="Copy to clipboard">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+              </svg>
+            </button>
+          </div>
+          <div class="pattern-output">
+            <code id="patternOutput">No pattern generated</code>
+          </div>
+          <div class="pattern-info" id="patternInfo">
+            <div class="info-item">
+              <span class="info-label">Match Type:</span>
+              <span class="info-value" id="matchType">-</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Wildcards:</span>
+              <span class="info-value" id="wildcardCount">0</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Pattern Tips -->
+        <section class="tips-section">
+          <details class="tips-details">
+            <summary class="tips-header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M11 17h2v-6h-2v6zm1-15C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM11 9h2V7h-2v2z"/>
+              </svg>
+              Tips for URL Patterns
+            </summary>
+            <div class="tips-content">
+              <ul class="tips-list">
+                <li><strong>Exact Match:</strong> Use the full URL to match only that specific page</li>
+                <li><strong>Wildcard (*):</strong> Replace dynamic segments (IDs, GUIDs) with * to match any value</li>
+                <li><strong>Ignore After (**):</strong> Use ** for hash routers to match all routes within an SPA</li>
+                <li><strong>Contains:</strong> Match any URL containing specific text (use for flexible matching)</li>
+              </ul>
+              <a href="https://support.pendo.io/hc/en-us/articles/360031862452" target="_blank" class="tips-link">
+                Learn more about Pendo URL patterns →
+              </a>
+            </div>
+          </details>
+        </section>
+      </div>
+
+      <!-- Current URL Pattern (Old, kept for compatibility) -->
+      <section class="url-pattern-section" id="urlPatternSection" style="display: none;">
         <div class="section-header">
           <h2>URL Pattern</h2>
           <button class="icon-btn" id="copyUrlPattern">

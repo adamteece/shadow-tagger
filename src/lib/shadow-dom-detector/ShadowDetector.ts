@@ -261,13 +261,13 @@ export class ShadowDetector {
       // Filter out closed shadows if not requested
       if (!options.includeClosedShadows && context.hasClosedShadow) {
         // Create a new context with only open shadows
-        const openShadowPath = context.shadowPath.filter(path => path.mode === 'open');
+        const openShadowPath = context.shadowPathDetailed.filter(path => path.mode === 'open');
         const openShadowRoots = openShadowPath.map(path => path.root);
         
         return new ShadowContext({
           isInShadowDOM: openShadowRoots.length > 0,
           targetElement: context.targetElement,
-          hostElement: openShadowRoots.length > 0 ? (openShadowPath[0]?.host || null) : null,
+          hostElement: openShadowPath.length > 0 ? (openShadowPath[0]?.host || null) : null,
           shadowPath: openShadowRoots
         });
       }
@@ -279,9 +279,9 @@ export class ShadowDetector {
   }
 
   private isValidElement(element: HTMLElement): boolean {
-    return element instanceof HTMLElement && 
-           element.isConnected && 
-           document.contains(element);
+    // Element must be an HTMLElement and connected to the DOM
+    // Note: Elements in shadow DOM won't be in document, but will be isConnected
+    return element instanceof HTMLElement && element.isConnected;
   }
 
   private calculateElementsAnalyzed(context: ShadowContext): number {

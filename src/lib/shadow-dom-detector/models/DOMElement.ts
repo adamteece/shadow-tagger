@@ -38,10 +38,11 @@ export class DOMElement {
   private _element: HTMLElement;
   private _attributes: ElementAttributes;
   private _position: ElementPosition;
-  private _hierarchy: ElementHierarchy;
+  private _hierarchy: ElementHierarchy | null = null;
   private _isValid: boolean;
+  private static readonly MAX_HIERARCHY_DEPTH = 3; // Limit recursion depth
 
-  constructor(element: HTMLElement) {
+  constructor(element: HTMLElement, private _skipHierarchy: boolean = false) {
     if (!element || !(element instanceof HTMLElement)) {
       throw new Error('Invalid element: must be an HTMLElement');
     }
@@ -50,7 +51,7 @@ export class DOMElement {
     this._isValid = this.validateElement();
     this._attributes = this.extractAttributes();
     this._position = this.calculatePosition();
-    this._hierarchy = this.analyzeHierarchy();
+    // Hierarchy is now lazy-loaded to prevent infinite recursion
   }
 
   // Getters
@@ -67,6 +68,9 @@ export class DOMElement {
   }
 
   get hierarchy(): ElementHierarchy {
+    if (!this._hierarchy) {
+      this._hierarchy = this.analyzeHierarchy();
+    }
     return {
       ...this._hierarchy,
       parent: this._hierarchy.parent,
@@ -245,21 +249,20 @@ export class DOMElement {
     };
   }
 
-  private analyzeHierarchy(): ElementHierarchy {
-    const parent = this._element.parentElement ? 
-      new DOMElement(this._element.parentElement) : null;
+  private analyzeHierarchy(currentDepth: number = 0): ElementHierarchy {
+    // Prevent infinite recursion by limiting hierarchy depth
+    const shouldSkipChildren = this._skipHierarchy || currentDepth >= DOMElement.MAX_HIERARCHY_DEPTH;
     
-    const children = Array.from(this._element.children)
-      .filter(child => child instanceof HTMLElement)
-      .map(child => new DOMElement(child as HTMLElement));
+    // Only create parent if not at max depth
+    const parent = (!shouldSkipChildren && this._element.parentElement) ? 
+      new DOMElement(this._element.parentElement, true) : null;
     
-    const siblings = parent ? 
-      Array.from(parent.element.children)
-        .filter(sibling => sibling instanceof HTMLElement && sibling !== this._element)
-        .map(sibling => new DOMElement(sibling as HTMLElement)) : [];
+    // Don't create child/sibling DOMElements to avoid recursion
+    const children: DOMElement[] = [];
+    const siblings: DOMElement[] = [];
     
-    const index = parent ? 
-      Array.from(parent.element.children).indexOf(this._element) : 0;
+    const index = this._element.parentElement ? 
+      Array.from(this._element.parentElement.children).indexOf(this._element) : 0;
     
     let depth = 0;
     let current = this._element.parentElement;
@@ -275,6 +278,18 @@ export class DOMElement {
       index,
       depth
     };
+  }
+  
+  // Helper methods to get children/siblings without creating DOMElement wrappers
+  getChildElements(): HTMLElement[] {
+    return Array.from(this._element.children)
+      .filter(child => child instanceof HTMLElement) as HTMLElement[];
+  }
+  
+  getSiblingElements(): HTMLElement[] {
+    if (!this._element.parentElement) return [];
+    return Array.from(this._element.parentElement.children)
+      .filter(sibling => sibling instanceof HTMLElement && sibling !== this._element) as HTMLElement[];
   }
 
   // Utility methods

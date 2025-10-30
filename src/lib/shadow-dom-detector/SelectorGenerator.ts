@@ -11,6 +11,8 @@ export interface SelectorOptions {
   includeNthChild: boolean;
   shadowDOMStrategy: 'host-based' | 'full-path' | 'minimal';
   pendoCompatible: boolean;
+  selectedAttributes?: string[]; // User-selected attributes to include in selector
+  excludeAttributes?: string[]; // Attributes to explicitly exclude
 }
 
 export interface SelectorAnalysis {
@@ -170,6 +172,81 @@ export class SelectorGenerator {
     return this.generateSelector(context, options);
   }
 
+  /**
+   * Get available attributes for user selection
+   */
+  getAvailableAttributes(element: HTMLElement): {
+    name: string;
+    value: string;
+    category: 'stable' | 'semantic' | 'styling' | 'other';
+    recommended: boolean;
+  }[] {
+    const attributes: {
+      name: string;
+      value: string;
+      category: 'stable' | 'semantic' | 'styling' | 'other';
+      recommended: boolean;
+    }[] = [];
+
+    // Categorize attributes for better UX
+    const stableAttributes = ['id', 'data-testid', 'data-component', 'data-test', 'data-cy', 'name'];
+    const semanticAttributes = ['aria-label', 'aria-labelledby', 'role', 'type', 'title', 'alt', 'placeholder'];
+    const stylingAttributes = ['class', 'style'];
+
+    Array.from(element.attributes).forEach(attr => {
+      let category: 'stable' | 'semantic' | 'styling' | 'other' = 'other';
+      let recommended = false;
+
+      if (stableAttributes.includes(attr.name)) {
+        category = 'stable';
+        recommended = true;
+      } else if (semanticAttributes.includes(attr.name)) {
+        category = 'semantic';
+        recommended = true;
+      } else if (stylingAttributes.includes(attr.name)) {
+        category = 'styling';
+        recommended = false;
+      } else if (attr.name.startsWith('data-')) {
+        category = 'stable';
+        recommended = true;
+      }
+
+      attributes.push({
+        name: attr.name,
+        value: attr.value,
+        category,
+        recommended
+      });
+    });
+
+    // Sort by recommendation and category
+    return attributes.sort((a, b) => {
+      if (a.recommended !== b.recommended) {
+        return a.recommended ? -1 : 1;
+      }
+      const categoryOrder = { stable: 0, semantic: 1, styling: 2, other: 3 };
+      return categoryOrder[a.category] - categoryOrder[b.category];
+    });
+  }
+
+  /**
+   * Generate selector with user-selected attributes
+   */
+  async generateWithAttributes(
+    context: ShadowContext,
+    selectedAttributes: string[],
+    options?: Partial<SelectorOptions>
+  ): Promise<CSSSelector | null> {
+    const opts = {
+      ...this.defaultOptions,
+      ...options,
+      selectedAttributes,
+      preferStableAttributes: false // Override to use selected attributes
+    };
+
+    return this.generateSelector(context, opts);
+  }
+
   // Private methods
   private async generateShadowDOMSelector(
     context: ShadowContext,
@@ -304,28 +381,33 @@ export class SelectorGenerator {
   }
 
   private generateElementSelector(element: DOMElement, options: SelectorOptions): string {
+    // If user selected specific attributes, use those
+    if (options.selectedAttributes && options.selectedAttributes.length > 0) {
+      return this.generateSelectorFromSelectedAttributes(element, options.selectedAttributes);
+    }
+
     // Preference order for stable selectors
     if (options.preferStableAttributes) {
       // 1. ID
-      if (element.id) {
+      if (element.id && !this.isExcluded('id', options.excludeAttributes)) {
         return `#${element.id}`;
       }
       
       // 2. data-testid
       const testId = element.getAttribute('data-testid');
-      if (testId) {
+      if (testId && !this.isExcluded('data-testid', options.excludeAttributes)) {
         return `[data-testid="${testId}"]`;
       }
       
       // 3. data-component
       const component = element.getAttribute('data-component');
-      if (component) {
+      if (component && !this.isExcluded('data-component', options.excludeAttributes)) {
         return `[data-component="${component}"]`;
       }
       
       // 4. aria-label
       const ariaLabel = element.getAttribute('aria-label');
-      if (ariaLabel) {
+      if (ariaLabel && !this.isExcluded('aria-label', options.excludeAttributes)) {
         return `[aria-label="${ariaLabel}"]`;
       }
     }
@@ -566,6 +648,50 @@ export class SelectorGenerator {
     
     return recommendations;
   }
+
+  private generateSelectorFromSelectedAttributes(
+    element: DOMElement,
+    selectedAttributes: string[]
+  ): string {
+    const parts: string[] = [];
+    
+    // Start with tag name
+    parts.push(element.tagName);
+    
+    // Process selected attributes
+    for (const attrName of selectedAttributes) {
+      if (attrName === 'id' && element.id) {
+        // Replace tag with ID selector for more specificity
+        return `#${element.id}`;
+      } else if (attrName === 'class' && element.className) {
+        const classes = this.filterStableClasses(element.className);
+        if (classes.length > 0) {
+          parts.push(`.${classes.join('.')}`);
+        }
+      } else {
+        const value = element.getAttribute(attrName);
+        if (value !== null) {
+          // Escape special characters in attribute values
+          const escapedValue = this.escapeAttributeValue(value);
+          parts.push(`[${attrName}="${escapedValue}"]`);
+        }
+      }
+    }
+    
+    return parts.join('');
+  }
+
+  private escapeAttributeValue(value: string): string {
+    return value
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r');
+  }
+
+  private isExcluded(attrName: string, excludeAttributes?: string[]): boolean {
+    return excludeAttributes ? excludeAttributes.includes(attrName) : false;
+  }
 }
 
 // Export the main generation function for use in tests
@@ -575,4 +701,19 @@ export async function generateSelector(
 ): Promise<CSSSelector | null> {
   const generator = SelectorGenerator.getInstance();
   return generator.generateSelector(context, options);
+}
+
+// Export attribute selection functions
+export function getAvailableAttributes(element: HTMLElement) {
+  const generator = SelectorGenerator.getInstance();
+  return generator.getAvailableAttributes(element);
+}
+
+export async function generateWithAttributes(
+  context: ShadowContext,
+  selectedAttributes: string[],
+  options?: Partial<SelectorOptions>
+): Promise<CSSSelector | null> {
+  const generator = SelectorGenerator.getInstance();
+  return generator.generateWithAttributes(context, selectedAttributes, options);
 }

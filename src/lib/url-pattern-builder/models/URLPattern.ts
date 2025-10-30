@@ -132,7 +132,21 @@ export class URLPattern {
   }
 
   get fragment(): string {
-    return this._components.hash.replace(/^#!?\//, '');
+    // Remove the # or #! prefix but preserve the leading /
+    const hash = this._components.hash;
+    if (hash.startsWith('#!/')) {
+      return '/' + hash.substring(3); // Remove #!/
+    } else if (hash.startsWith('#/')) {
+      return '/' + hash.substring(2); // Remove #/
+    } else if (hash.startsWith('#')) {
+      const content = hash.substring(1); // Remove #
+      // Add leading / if it contains / but doesn't start with it
+      if (content.includes('/') && !content.startsWith('/')) {
+        return '/' + content;
+      }
+      return content.startsWith('/') ? content : '/' + content;
+    }
+    return '';
   }
 
   get hashFragment(): string {
@@ -342,13 +356,29 @@ export class URLPattern {
   }
 
   private identifyVolatileSegments(): VolatileSegment[] {
-    const segments = this.getSegments();
+    const allSegments = this._components.pathname.split('/'); // Include empty segments
+    const segments = allSegments.filter(segment => segment.length > 0); // Filtered for processing
     const volatileSegments: VolatileSegment[] = [];
     
-    segments.forEach((segment, index) => {
-      const volatileSegment = VolatileSegment.analyze(segment, index, {
+    segments.forEach((segment, filterIndex) => {
+      // Find the actual position in the original segments array
+      let actualPosition = 0;
+      let foundCount = 0;
+      for (let i = 0; i < allSegments.length; i++) {
+        if (allSegments[i].length > 0) {
+          if (foundCount === filterIndex) {
+            actualPosition = i;
+            break;
+          }
+          foundCount++;
+        }
+      }
+      
+      const volatileSegment = VolatileSegment.analyze(segment, actualPosition, {
         pathname: this._components.pathname,
-        isHashFragment: false
+        isHashFragment: false,
+        previousSegment: filterIndex > 0 ? segments[filterIndex - 1] : undefined,
+        nextSegment: filterIndex < segments.length - 1 ? segments[filterIndex + 1] : undefined
       });
       
       if (volatileSegment) {
@@ -362,7 +392,9 @@ export class URLPattern {
       hashSegments.forEach((segment, index) => {
         const volatileSegment = VolatileSegment.analyze(segment, index, {
           pathname: this.fragment,
-          isHashFragment: true
+          isHashFragment: true,
+          previousSegment: index > 0 ? hashSegments[index - 1] : undefined,
+          nextSegment: index < hashSegments.length - 1 ? hashSegments[index + 1] : undefined
         });
         
         if (volatileSegment) {

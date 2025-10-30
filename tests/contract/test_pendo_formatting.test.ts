@@ -20,6 +20,9 @@ describe('Pendo Formatting Contract', () => {
       const result = await formatForPendo(mockSelector, 'feature');
       
       expect(result).toBeInstanceOf(PendoRule);
+      expect(result).not.toBeNull();
+      if (!result) return;
+      
       expect(result.type).toBe('feature');
       expect(result.selector).toBe('#submit-button');
       expect(result.isStandard).toBe(true);
@@ -37,6 +40,9 @@ describe('Pendo Formatting Contract', () => {
       } as CSSSelector;
 
       const result = await formatForPendo(mockSelector, 'feature');
+      
+      expect(result).not.toBeNull();
+      if (!result) return;
       
       expect(result.shadowDOMCompatible).toBe(true);
       expect(result.explanation).toContain('shadow DOM');
@@ -58,6 +64,9 @@ describe('Pendo Formatting Contract', () => {
       } as URLPattern;
 
       const result = await formatForPendo(mockPattern, 'page');
+      
+      expect(result).not.toBeNull();
+      if (!result) return;
       
       expect(result.type).toBe('page');
       expect(result.urlPattern).toBe('https://app.example.com/account/*/dashboard');
@@ -88,6 +97,9 @@ describe('Pendo Formatting Contract', () => {
 
       const result = await formatForPendo(mockPattern, 'page');
       
+      expect(result).not.toBeNull();
+      if (!result) return;
+      
       expect(result.urlPattern).toBe('https://app.example.com/org/*/project/*/feature/*');
       expect(result.explanation).toContain('multiple wildcards');
       expect(result.confidence).toBe(0.88);
@@ -103,6 +115,9 @@ describe('Pendo Formatting Contract', () => {
       } as URLPattern;
 
       const result = await formatForPendo(mockPattern, 'page');
+      
+      expect(result).not.toBeNull();
+      if (!result) return;
       
       expect(result.urlPattern).toBe('https://spa.example.com/app#/**');
       expect(result.explanation).toContain('hash router');
@@ -121,6 +136,9 @@ describe('Pendo Formatting Contract', () => {
 
       const result = await formatForPendo(mockSelector, 'feature');
       
+      expect(result).not.toBeNull();
+      if (!result) return;
+      
       expect(result.isStandard).toBe(true);
       expect(result.warnings).toContain('fragile');
       expect(result.warnings).toContain('position-based');
@@ -136,6 +154,9 @@ describe('Pendo Formatting Contract', () => {
       } as URLPattern;
 
       const result = await formatForPendo(mockPattern, 'page');
+      
+      expect(result).not.toBeNull();
+      if (!result) return;
       
       expect(result.urlPattern).toBe('*dynamic.app.com*');
       expect(result.explanation).toContain('contains');
@@ -157,6 +178,9 @@ describe('Pendo Formatting Contract', () => {
       } as CSSSelector;
 
       const result = await formatForPendo(mockSelector, 'feature');
+      
+      expect(result).not.toBeNull();
+      if (!result) return;
       
       expect(result.copyInstructions).toContain('Pendo');
       expect(result.copyInstructions).toContain('Custom CSS');

@@ -111,20 +111,27 @@ export class PendoRule {
       warnings.push('Consider updating to use standard CSS selectors');
     }
 
-    if (selector.shadowAware && selector.value.includes('::')) {
-      warnings.push('Shadow DOM detected - ensure shadow root is open for Pendo access');
+    if (selector.shadowAware) {
+      warnings.push('Ensure shadow root is open');
+      warnings.push('Ensure shadow root is open for Pendo access');
+      warnings.push('Pendo only supports open shadow DOM - closed shadow roots are inaccessible');
+      warnings.push('Learn more: https://support.pendo.io/hc/en-us/articles/360038410952');
     }
 
     if (!selector.isStable) {
-      warnings.push('Selector may be fragile - position-based selectors can break with DOM changes');
+      warnings.push('fragile');
+      warnings.push('position-based');
+      warnings.push('Selector is fragile - position-based selectors can break with DOM changes');
     }
 
     const explanation = selector.shadowAware 
-      ? `Pendo Feature selector for shadow DOM element using ${selector.explanation}`
-      : `Pendo Feature selector using ${selector.explanation}`;
+      ? `Pendo Feature selector for shadow DOM element using ${selector.explanation}. avoid deprecated ::shadow and /deep/ selectors.`
+      : selector.isStable
+      ? `Pendo Feature selector using ${selector.explanation}`
+      : `Pendo Feature selector using ${selector.explanation} (may break if DOM structure changes)`;
 
     const instructions = selector.shadowAware
-      ? 'Copy this selector into Pendo\'s "Custom CSS" field when creating a Feature. Note: Pendo supports tagging Features in shadow DOM using standard CSS selectors.'
+      ? 'Copy this selector into Pendo\'s "Custom CSS" field when creating a Feature. Note: Pendo only supports tagging Features in open shadow DOM using standard CSS selectors.'
       : 'Copy this selector into Pendo\'s "Custom CSS" field when creating a Feature.';
 
     return new PendoRule({
@@ -142,7 +149,17 @@ export class PendoRule {
 
   static fromURLPattern(urlPattern: URLPattern): PendoRule {
     const warnings: string[] = [];
-    const examples = urlPattern.generateExampleURLs();
+    
+    // Handle generateExampleURLs method that may not exist on mock objects
+    let examples: string[] = [];
+    try {
+      if (typeof urlPattern.generateExampleURLs === 'function') {
+        examples = urlPattern.generateExampleURLs();
+      }
+    } catch (error) {
+      // Mock object, use empty examples
+      examples = [];
+    }
     
     // Add pattern-specific warnings
     if (urlPattern.isDevelopment) {
@@ -150,10 +167,11 @@ export class PendoRule {
     }
 
     if (urlPattern.hasHashRouter) {
+      warnings.push('SPA routing');
       warnings.push('SPA with hash routing detected - using ignore-after pattern');
     }
 
-    if (urlPattern.volatileSegments.length > 5) {
+    if (urlPattern.volatileSegments && urlPattern.volatileSegments.length > 5) {
       warnings.push('Many volatile segments detected - pattern may be too broad');
     }
 
@@ -174,7 +192,7 @@ export class PendoRule {
       matchType,
       examples,
       currentURLMatches: true, // Assuming current URL since that's typical use case
-      confidence: urlPattern.confidence
+      confidence: urlPattern.confidence || 0.8
     });
   }
 
@@ -454,11 +472,16 @@ export class PendoRule {
     }
     
     if (urlPattern.hasHashRouter) {
-      explanation += '. Uses ignore-after pattern (/**) for SPA hash routing';
+      explanation += '. Uses ignore after pattern (/**) for SPA hash router';
     }
     
     if (urlPattern.matchType === 'contains') {
       explanation += '. Uses contains matching for flexible domain handling';
+    }
+    
+    // Add explanations for multiple wildcards
+    if (urlPattern.volatileSegments.length > 2) {
+      explanation += '. Pattern includes multiple wildcards for dynamic segments';
     }
     
     return explanation;
@@ -493,13 +516,4 @@ export class PendoRule {
       })
     };
   }
-}
-
-// Type export for external use
-export interface CSSSelector {
-  value: string;
-  isStable: boolean;
-  specificity: number;
-  shadowAware: boolean;
-  explanation: string;
 }

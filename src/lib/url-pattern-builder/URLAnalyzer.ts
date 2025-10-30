@@ -2,7 +2,7 @@
 // Analyzes URLs and identifies volatile/stable segments
 
 import { URLPattern } from './models/URLPattern';
-import { VolatileSegment, type SegmentType } from './models/VolatileSegment';
+import { VolatileSegment, type SegmentType, type SegmentContext } from './models/VolatileSegment';
 
 export interface AnalysisOptions {
   includeDomains: boolean;
@@ -180,8 +180,8 @@ export class URLAnalyzer {
       const pathSegments = urlObj.pathname.split('/').filter(Boolean);
       pathSegments.forEach((segment, index) => {
         const volatileType = this.detectVolatileType(segment);
-        if (volatileType !== 'stable') {
-          const segmentContext = {
+        if (volatileType) { // detectVolatileType returns undefined for stable segments
+          const segmentContext: SegmentContext = {
             pathname: urlObj.pathname,
             isHashFragment: false,
             hostDomain: urlObj.hostname
@@ -202,8 +202,8 @@ export class URLAnalyzer {
       // Analyze query parameters
       urlObj.searchParams.forEach((value) => {
         const volatileType = this.detectVolatileType(value);
-        if (volatileType !== 'stable') {
-          const segmentContext = {
+        if (volatileType) { // detectVolatileType returns undefined for stable segments
+          const segmentContext: SegmentContext = {
             pathname: urlObj.pathname,
             isHashFragment: false,
             hostDomain: urlObj.hostname

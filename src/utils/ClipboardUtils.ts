@@ -14,6 +14,34 @@ export interface ClipboardResult {
   method: 'navigator' | 'execCommand' | 'fallback';
   error?: string;
   data?: string;
+  copiedText?: string;
+  format?: string;
+  feedback?: string;
+  warnings?: string[];
+  instructions?: string;
+  timestamp?: Date;
+  fallbackUsed?: boolean;
+  fallbackInstructions?: string;
+}
+
+export interface CopyMetadata {
+  type?: string;
+  isStable?: boolean;
+  shadowAware?: boolean;
+  explanation?: string;
+  warnings?: string[];
+  confidence?: number;
+  originalURL?: string;
+  volatileSegments?: any[];
+  examples?: string[];
+}
+
+export interface CopyHistoryItem {
+  text: string;
+  metadata: CopyMetadata;
+  timestamp: number;
+  format: string;
+  sourceTab?: string;
 }
 
 export interface ElementData {
@@ -44,10 +72,131 @@ export class ClipboardUtils {
   };
   
   private notificationElement: HTMLElement | null = null;
+  private copyHistory: CopyHistoryItem[] = [];
+  private maxHistorySize: number = 50;
   
-  constructor(customOptions?: Partial<ClipboardOptions>) {
+  constructor(customOptions?: Partial<ClipboardOptions> | any) {
     if (customOptions) {
       this.options = { ...this.options, ...customOptions };
+    }
+  }
+  
+  /**
+   * Copy CSS selector with metadata
+   */
+  async copySelector(selector: string, metadata: CopyMetadata): Promise<ClipboardResult> {
+    const result = await this.copyText(selector);
+    
+    if (result.success) {
+      result.copiedText = selector;
+      result.format = metadata.type || 'css-selector';
+      result.warnings = metadata.warnings;
+      
+      if (metadata.shadowAware) {
+        result.feedback = 'Shadow DOM selector copied';
+        result.instructions = 'Use in Pendo Custom CSS with shadow piercing support';
+      } else if (metadata.isStable === false) {
+        result.feedback = 'Fragile selector copied';
+        result.warnings = result.warnings || [];
+        if (!result.warnings.includes('May break with DOM changes')) {
+          result.warnings.push('May break with DOM changes');
+        }
+      } else {
+        result.feedback = 'Copied CSS selector';
+      }
+      
+      this.addToHistory({
+        text: selector,
+        metadata,
+        timestamp: Date.now(),
+        format: result.format
+      });
+    }
+    
+    return result;
+  }
+  
+  /**
+   * Copy URL pattern with metadata
+   */
+  async copyURLPattern(pattern: string, metadata: CopyMetadata): Promise<ClipboardResult> {
+    const result = await this.copyText(pattern);
+    
+    if (result.success) {
+      result.copiedText = pattern;
+      result.format = metadata.type || 'url-pattern';
+      result.feedback = `URL pattern copied (${(metadata.confidence || 0) * 100}% confidence)`;
+      
+      if (metadata.examples && metadata.examples.length > 0) {
+        result.instructions = `Pattern will match URLs like: ${metadata.examples[0]}`;
+      }
+      
+      this.addToHistory({
+        text: pattern,
+        metadata,
+        timestamp: Date.now(),
+        format: result.format
+      });
+    }
+    
+    return result;
+  }
+  
+  /**
+   * Copy Pendo formatted data
+   */
+  async copyPendoFormatted(data: any): Promise<ClipboardResult> {
+    const jsonString = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    const result = await this.copyText(jsonString);
+    
+    if (result.success) {
+      result.copiedText = jsonString;
+      result.format = 'pendo-json';
+      result.feedback = 'Pendo formatted data copied';
+      result.instructions = 'Paste into Pendo Designer or configuration file';
+      
+      this.addToHistory({
+        text: jsonString,
+        metadata: { type: 'pendo-formatted' },
+        timestamp: Date.now(),
+        format: 'pendo-json'
+      });
+    }
+    
+    return result;
+  }
+  
+  /**
+   * Get copy history
+   */
+  getCopyHistory(): CopyHistoryItem[] {
+    return [...this.copyHistory];
+  }
+  
+  /**
+   * Handle cross-tab copy operations
+   */
+  async handleCrossTabCopy(copyEvent: any): Promise<void> {
+    if (copyEvent && copyEvent.text && copyEvent.metadata) {
+      this.addToHistory({
+        text: copyEvent.text,
+        metadata: copyEvent.metadata,
+        timestamp: copyEvent.timestamp || Date.now(),
+        format: copyEvent.format || 'unknown',
+        sourceTab: copyEvent.sourceTab
+      });
+    }
+  }
+  
+  /**
+   * Add item to copy history
+   */
+  private addToHistory(item: CopyHistoryItem): void {
+    this.copyHistory.unshift(item);
+    
+    // Trim history to max size
+    if (this.copyHistory.length > this.maxHistorySize) {
+      this.copyHistory = this.copyHistory.slice(0, this.maxHistorySize);
     }
   }
   
@@ -59,7 +208,8 @@ export class ClipboardUtils {
       return {
         success: false,
         method: 'navigator',
-        error: 'No text provided'
+        error: 'No text provided',
+        timestamp: new Date()
       };
     }
     
@@ -75,7 +225,9 @@ export class ClipboardUtils {
         return {
           success: true,
           method: 'navigator',
-          data: text
+          data: text,
+          timestamp: new Date(),
+          fallbackUsed: false
         };
       } catch (error) {
         console.warn('Clipboard API failed, trying fallback:', error);
@@ -90,13 +242,22 @@ export class ClipboardUtils {
         this.showNotification('Copied to clipboard!');
       }
       
+      result.timestamp = new Date();
+      result.fallbackUsed = true;
+      
+      if (!result.success) {
+        result.fallbackInstructions = `Please manually select and copy: ${text}`;
+      }
+      
       return result;
     }
     
     return {
       success: false,
       method: 'navigator',
-      error: 'Clipboard access not available'
+      error: 'Clipboard access not available',
+      timestamp: new Date(),
+      fallbackInstructions: `Please manually select and copy: ${text}`
     };
   }
   

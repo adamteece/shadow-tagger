@@ -158,6 +158,59 @@ input:checked + .toggle-slider:before {
   overflow-y: auto;
 }
 
+/* Tabs Navigation */
+.tabs-nav {
+  display: flex;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
+  border-bottom: 2px solid var(--outline-color);
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-family: inherit;
+  font-size: var(--font-size-medium);
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+  background: var(--surface-variant);
+}
+
+.tab-btn.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+}
+
+.tab-btn svg {
+  opacity: 0.7;
+}
+
+.tab-btn.active svg {
+  opacity: 1;
+}
+
+/* Tab Content */
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+  animation: fadeIn 0.3s ease-out;
+}
+
 /* Quick Actions */
 .quick-actions {
   display: flex;
@@ -351,6 +404,246 @@ input:checked + .toggle-slider:before {
   font-size: var(--font-size-small);
   color: var(--text-primary);
   word-break: break-all;
+}
+
+/* Page Rules Tab Styles */
+.current-url-section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.url-display {
+  background: var(--surface-variant);
+  border: 1px solid var(--outline-color);
+  border-radius: var(--border-radius-small);
+  padding: var(--spacing-md);
+}
+
+.url-display code {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: var(--font-size-small);
+  color: var(--text-primary);
+  word-break: break-all;
+  display: block;
+  line-height: 1.5;
+}
+
+.url-builder-section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.url-segments-container {
+  min-height: 100px;
+}
+
+.segments-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.segment-item {
+  background: var(--surface-variant);
+  border: 1px solid var(--outline-color);
+  border-radius: var(--border-radius-small);
+  padding: var(--spacing-sm);
+  transition: all 0.2s ease;
+}
+
+.segment-item:hover {
+  background: white;
+  box-shadow: var(--shadow-light);
+}
+
+.segment-item.volatile {
+  border-left: 3px solid var(--warning-color);
+}
+
+.segment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-xs);
+}
+
+.segment-type {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.segment-type-badge {
+  padding: 2px 6px;
+  background: var(--warning-color);
+  color: white;
+  border-radius: var(--border-radius-small);
+  font-size: 10px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.segment-type-badge.stable {
+  background: var(--secondary-color);
+}
+
+.segment-value {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: var(--font-size-small);
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-xs);
+  word-break: break-all;
+}
+
+.segment-controls {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
+.segment-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: white;
+  border: 1px solid var(--outline-color);
+  border-radius: var(--border-radius-small);
+  font-size: var(--font-size-small);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.segment-toggle:hover {
+  border-color: var(--primary-color);
+}
+
+.segment-toggle.active {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.segment-toggle input[type="radio"] {
+  margin: 0;
+  width: 14px;
+  height: 14px;
+}
+
+.pattern-output-section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.pattern-output {
+  background: #f0f7ff;
+  border: 2px solid var(--primary-color);
+  border-radius: var(--border-radius-small);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+}
+
+.pattern-output code {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: var(--font-size-medium);
+  font-weight: 600;
+  color: var(--primary-color);
+  word-break: break-all;
+  display: block;
+  line-height: 1.6;
+}
+
+.pattern-info {
+  display: flex;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm);
+  background: var(--surface-variant);
+  border-radius: var(--border-radius-small);
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.info-label {
+  font-size: var(--font-size-small);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: var(--font-size-small);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.tips-section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.tips-details {
+  background: var(--surface-variant);
+  border-radius: var(--border-radius-small);
+  border: 1px solid var(--outline-color);
+}
+
+.tips-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: color 0.2s ease;
+}
+
+.tips-header:hover {
+  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.tips-content {
+  padding: var(--spacing-md);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--outline-color);
+}
+
+.tips-list {
+  margin: 0;
+  padding-left: var(--spacing-lg);
+  font-size: var(--font-size-small);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.tips-list li {
+  margin-bottom: var(--spacing-sm);
+}
+
+.tips-list strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.tips-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-sm);
+  color: var(--primary-color);
+  text-decoration: none;
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.tips-link:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
 }
 
 /* Settings Section */

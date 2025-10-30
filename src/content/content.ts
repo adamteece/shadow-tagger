@@ -6,6 +6,8 @@ import { detectShadowContext } from '../lib/shadow-dom-detector/ShadowDetector';
 import { generateSelector } from '../lib/shadow-dom-detector/SelectorGenerator';
 import { analyzeURL } from '../lib/url-pattern-builder/URLAnalyzer';
 import { formatRule } from '../lib/pendo-formatter/PendoFormatter';
+import { AttributePicker } from './AttributePicker';
+import { ShadowContext } from '../lib/shadow-dom-detector/models/ShadowContext';
 
 export interface ElementPickerOptions {
   enabled: boolean;
@@ -31,6 +33,8 @@ class ContentScript {
   private tooltip: HTMLElement | null = null;
   private lastAnalyzedElement: HTMLElement | null = null;
   private analysisResults: AnalysisResult[] = [];
+  private attributePicker: AttributePicker | null = null;
+  private currentShadowContext: ShadowContext | null = null;
   
   private options: ElementPickerOptions = {
     enabled: true,
@@ -56,6 +60,7 @@ class ContentScript {
   private async setup(): Promise<void> {
     console.log('Setting up content script...');
     this.createOverlay();
+    this.attributePicker = new AttributePicker();
     this.setupMessageListeners();
     this.setupKeyboardShortcuts();
     await this.loadExistingResults();
@@ -138,6 +143,12 @@ class ContentScript {
         case 'CLEAR_ANALYSIS':
           this.clearAnalysis();
           return { success: true };
+
+        case 'SHOW_ATTRIBUTE_PICKER':
+          return this.showAttributePickerForElement(message.elementSelector);
+
+        case 'CUSTOMIZE_SELECTOR':
+          return this.customizeSelector(message.selectedAttributes);
           
         default:
           console.log('Unknown message type:', message.type);
@@ -240,6 +251,38 @@ class ContentScript {
     if (target && target !== this.overlay && target !== this.tooltip) {
       console.log('Analyzing clicked element');
       await this.analyzeElement(target);
+      
+      // Show attribute picker for selector customization
+      if (this.currentShadowContext && this.attributePicker) {
+        await this.attributePicker.show(
+          target,
+          this.currentShadowContext,
+          async (selectedAttrs, selector) => {
+            // Update analysis result with customized selector
+            if (this.analysisResults.length > 0) {
+              const lastResult = this.analysisResults[this.analysisResults.length - 1];
+              lastResult.selector = selector;
+              await this.saveAnalysisResults();
+              
+              // Notify background
+              await browser.runtime.sendMessage({
+                type: 'SELECTOR_CUSTOMIZED',
+                data: {
+                  selector,
+                  selectedAttributes: selectedAttrs,
+                  timestamp: Date.now()
+                }
+              });
+              
+              this.showPickerNotification(
+                `Selector customized: ${selector}`,
+                'success'
+              );
+            }
+          }
+        );
+      }
+      
       this.deactivateElementPicker();
     }
   };
@@ -296,10 +339,15 @@ class ContentScript {
     try {
       this.showPickerNotification('Analyzing element...', 'info');
       
+      // Create shadow context for the element
+      this.currentShadowContext = ShadowContext.create(element);
+      
       // For now, skip complex shadow DOM detection to avoid recursion issues
       const shadowContext = {
-        isInShadowDOM: false,
-        targetElement: element
+        isInShadowDOM: this.currentShadowContext.isInShadowDOM,
+        targetElement: element,
+        shadowDepth: this.currentShadowContext.shadowDepth,
+        hasClosedShadow: this.currentShadowContext.hasClosedShadow
       };
       
       // Generate a simple CSS selector
@@ -533,6 +581,72 @@ class ContentScript {
     } catch (error) {
       console.warn('*** CONTENT SCRIPT: URL analysis failed:', error);
       return { urlPattern: { pattern: window.location.href } };
+    }
+  }
+
+  private async showAttributePickerForElement(elementSelector: string): Promise<any> {
+    try {
+      const element = document.querySelector(elementSelector) as HTMLElement;
+      if (!element) {
+        return { success: false, error: 'Element not found' };
+      }
+
+      const context = ShadowContext.create(element);
+      
+      if (this.attributePicker) {
+        await this.attributePicker.show(element, context, async (selectedAttrs, selector) => {
+          await browser.runtime.sendMessage({
+            type: 'SELECTOR_CUSTOMIZED',
+            data: {
+              selector,
+              selectedAttributes: selectedAttrs,
+              elementSelector,
+              timestamp: Date.now()
+            }
+          });
+        });
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error showing attribute picker:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  private async customizeSelector(selectedAttributes: string[]): Promise<any> {
+    try {
+      if (!this.lastAnalyzedElement || !this.currentShadowContext) {
+        return { success: false, error: 'No element currently analyzed' };
+      }
+
+      const { generateWithAttributes } = await import('../lib/shadow-dom-detector/SelectorGenerator');
+      const cssSelector = await generateWithAttributes(
+        this.currentShadowContext,
+        selectedAttributes,
+        { pendoCompatible: true }
+      );
+
+      if (cssSelector && cssSelector.value) {
+        // Update last analysis result
+        if (this.analysisResults.length > 0) {
+          const lastResult = this.analysisResults[this.analysisResults.length - 1];
+          lastResult.selector = cssSelector.value;
+          await this.saveAnalysisResults();
+        }
+
+        return {
+          success: true,
+          selector: cssSelector.value,
+          specificity: cssSelector.specificity,
+          isStable: cssSelector.isStable
+        };
+      }
+
+      return { success: false, error: 'Could not generate selector' };
+    } catch (error) {
+      console.error('Error customizing selector:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 }

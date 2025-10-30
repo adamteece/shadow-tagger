@@ -250,19 +250,29 @@ export class VolatileSegment {
 
   // Static methods
   static identifySegmentType(segment: string, context: SegmentContext): SegmentType {
+    // Skip common stable route names
+    const stableKeywords = ['dashboard', 'settings', 'admin', 'home', 'about', 'contact', 'help', 'docs', 'api', 'login', 'logout', 'register', 'component', 'widget', 'module', 'feature', 'account', 'profile', 'users', 'products', 'search', 'edit', 'view', 'list', 'create', 'delete', 'update', 'logs'];
+    if (stableKeywords.includes(segment.toLowerCase())) {
+      return 'unknown'; // Not volatile
+    }
+    
     // Order matters - more specific patterns first
     const patterns: Array<{ pattern: RegExp; type: SegmentType; confidence?: number }> = [
       // GUIDs and UUIDs
       { pattern: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, type: 'guid' },
       { pattern: /^[0-9a-f]{32}$/i, type: 'guid' },
       
-      // Specific prefixed IDs
-      { pattern: /^ws_[a-z0-9]+$/i, type: 'workspace-id' },
-      { pattern: /^user_\d+$/i, type: 'user-id' },
-      { pattern: /^comp_[a-z0-9]+$/i, type: 'component-id' },
-      { pattern: /^feat_[a-z0-9]+$/i, type: 'feature-id' },
-      { pattern: /^sess_[a-z0-9]+$/i, type: 'session-id' },
-      { pattern: /^build_\d+$/i, type: 'build-id' },
+      // Specific prefixed IDs (check for both _ and - separators)
+      { pattern: /^ws[_-][a-z0-9]+$/i, type: 'workspace-id' },
+      { pattern: /^user[_-]\d+$/i, type: 'user-id' },
+      { pattern: /^comp[_-][a-z0-9]+$/i, type: 'component-id' },
+      { pattern: /^component[_-][a-z0-9]+$/i, type: 'component-id' },
+      { pattern: /^widget[_-][a-z0-9]+$/i, type: 'component-id' },
+      { pattern: /^module[_-][a-z0-9]+$/i, type: 'component-id' },
+      { pattern: /^feat[_-][a-z0-9]+$/i, type: 'feature-id' },
+      { pattern: /^feature[_-][a-z0-9]+$/i, type: 'feature-id' },
+      { pattern: /^sess[_-][a-z0-9]+$/i, type: 'session-id' },
+      { pattern: /^build[_-]\d+$/i, type: 'build-id' },
       
       // Versions
       { pattern: /^v?\d+\.\d+\.\d+$/i, type: 'version' },
@@ -276,11 +286,8 @@ export class VolatileSegment {
       // Hex hashes
       { pattern: /^[a-fA-F0-9]{6,64}$/, type: 'hash' },
       
-      // Numeric IDs (6+ digits to avoid false positives)
-      { pattern: /^\d{6,}$/, type: 'numeric-id' },
-      
-      // Shorter numeric IDs with context
-      { pattern: /^\d{3,5}$/, type: 'numeric-id' },
+      // Numeric IDs (3+ digits)
+      { pattern: /^\d{3,}$/, type: 'numeric-id' },
       
       // Alphanumeric IDs
       { pattern: /^[a-zA-Z]+\d+$/, type: 'alphanumeric-id' },

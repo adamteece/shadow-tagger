@@ -22,6 +22,10 @@ export interface TooltipData {
     isInShadowDOM: boolean;
     hostElement?: string;
     shadowDepth?: number;
+    mode?: 'open' | 'closed';
+    isAccessible?: boolean;
+    pendoCompatible?: boolean;
+    warnings?: string[];
   };
 }
 
@@ -247,14 +251,31 @@ export class ElementOverlay {
     let current: Node | null = element;
     let shadowDepth = 0;
     let hostElement: string | undefined;
+    let mode: 'open' | 'closed' | undefined;
+    let hasClosedShadow = false;
+    let isAccessible = true;
+    const warnings: string[] = [];
     
     while (current) {
       const parent: Node | null = current.parentNode;
       
       if (parent && (parent as any).host) {
         // We're in a shadow root
+        const shadowRoot = parent as ShadowRoot;
         shadowDepth++;
-        const host = (parent as any).host as HTMLElement;
+        const host = shadowRoot.host as HTMLElement;
+        
+        // Detect shadow root mode
+        const rootMode = this.detectShadowRootMode(shadowRoot, host);
+        if (shadowDepth === 1) {
+          mode = rootMode; // Store mode of immediate shadow root
+        }
+        
+        if (rootMode === 'closed') {
+          hasClosedShadow = true;
+          isAccessible = false;
+        }
+        
         if (!hostElement) {
           hostElement = this.getElementSelector(host);
         }
@@ -263,11 +284,52 @@ export class ElementOverlay {
       current = parent;
     }
     
+    // Add warnings for Pendo compatibility
+    if (shadowDepth > 0) {
+      if (hasClosedShadow) {
+        warnings.push('⚠️ Closed shadow DOM detected');
+        warnings.push('Pendo cannot tag elements in closed shadow roots');
+        warnings.push('Consider using open shadow roots or host element tagging');
+      } else if (mode === 'open') {
+        warnings.push('✓ Open shadow DOM - Pendo compatible');
+      }
+      
+      if (shadowDepth > 1) {
+        warnings.push(`⚡ Nested shadow DOM (${shadowDepth} levels)`);
+      }
+    }
+    
+    const pendoCompatible = shadowDepth === 0 || (mode === 'open' && !hasClosedShadow);
+    
     return {
       isInShadowDOM: shadowDepth > 0,
       hostElement,
-      shadowDepth: shadowDepth || undefined
+      shadowDepth: shadowDepth || undefined,
+      mode,
+      isAccessible,
+      pendoCompatible,
+      warnings: warnings.length > 0 ? warnings : undefined
     };
+  }
+  
+  /**
+   * Detect if shadow root is open or closed
+   */
+  private detectShadowRootMode(shadowRoot: ShadowRoot, host: HTMLElement): 'open' | 'closed' {
+    try {
+      // If we can access shadowRoot via host.shadowRoot, it's open
+      if ((host as any).shadowRoot === shadowRoot) {
+        return 'open';
+      }
+      // If host.shadowRoot exists but doesn't match, still likely open
+      if ((host as any).shadowRoot) {
+        return 'open';
+      }
+      // If we got here but shadowRoot exists, it's likely closed
+      return 'closed';
+    } catch {
+      return 'closed';
+    }
   }
   
   /**
@@ -315,10 +377,42 @@ export class ElementOverlay {
     }
     
     if (data.shadowInfo?.isInShadowDOM) {
-      content += `<div style="color: #f06292; margin-top: 4px;">⚡ Shadow DOM (depth: ${data.shadowInfo.shadowDepth})</div>`;
+      const modeColor = data.shadowInfo.mode === 'open' ? '#81c784' : '#ef5350';
+      const modeIcon = data.shadowInfo.mode === 'open' ? '✓' : '⚠️';
+      
+      content += `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.2);">`;
+      content += `<div style="color: #f06292; font-weight: 600;">⚡ Shadow DOM Element</div>`;
+      content += `<div style="color: ${modeColor}; font-size: 11px; margin-top: 2px;">${modeIcon} Mode: <strong>${data.shadowInfo.mode || 'unknown'}</strong></div>`;
+      content += `<div style="color: #ba68c8; font-size: 11px;">Depth: ${data.shadowInfo.shadowDepth}</div>`;
+      
       if (data.shadowInfo.hostElement) {
         content += `<div style="color: #ba68c8; font-size: 11px;">Host: ${data.shadowInfo.hostElement}</div>`;
       }
+      
+      // Show Pendo compatibility status
+      if (data.shadowInfo.pendoCompatible !== undefined) {
+        const compatColor = data.shadowInfo.pendoCompatible ? '#81c784' : '#ef5350';
+        const compatText = data.shadowInfo.pendoCompatible ? 'Compatible' : 'Not Compatible';
+        content += `<div style="color: ${compatColor}; font-size: 11px; margin-top: 4px;">Pendo: ${compatText}</div>`;
+      }
+      
+      // Show warnings
+      if (data.shadowInfo.warnings && data.shadowInfo.warnings.length > 0) {
+        content += `<div style="margin-top: 6px; font-size: 11px;">`;
+        for (const warning of data.shadowInfo.warnings.slice(0, 3)) {
+          content += `<div style="color: #ffb74d; margin-top: 2px;">${warning}</div>`;
+        }
+        content += `</div>`;
+      }
+      
+      // Add link to Pendo docs for closed shadow
+      if (data.shadowInfo.mode === 'closed') {
+        content += `<div style="margin-top: 6px;">`;
+        content += `<a href="https://support.pendo.io/hc/en-us/articles/360038410952" target="_blank" style="color: #64b5f6; font-size: 11px; text-decoration: none;">📖 Learn about Shadow DOM in Pendo →</a>`;
+        content += `</div>`;
+      }
+      
+      content += `</div>`;
     }
     
     return content;
