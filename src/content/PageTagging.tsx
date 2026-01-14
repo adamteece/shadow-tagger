@@ -144,7 +144,7 @@ export const PageTagging: React.FC = () => {
                                 <span style={{ fontWeight: 500, color: param.type === 'exclude' ? '#cc0000' : '#333' }}>
                                     {param.key}
                                     <span style={{ color: '#999', fontWeight: 'normal', marginLeft: '4px' }}>
-                                        ={param.type === 'exact' ? param.value : '*'}
+                                        {param.type === 'exact' ? `=${param.value}` : ' (match any value)'}
                                     </span>
                                 </span>
                                 <select
@@ -159,8 +159,8 @@ export const PageTagging: React.FC = () => {
                                         cursor: 'pointer'
                                     }}
                                 >
-                                    <option value="wildcard">Wildcard (*)</option>
-                                    <option value="exact">Exact</option>
+                                    <option value="wildcard">Any Value (omitted)</option>
+                                    <option value="exact">Exact Value</option>
                                     <option value="exclude">Exclude</option>
                                 </select>
                             </div>
@@ -191,7 +191,7 @@ export const PageTagging: React.FC = () => {
                                     {comp.isBase ? '#' : ';'}{comp.key}
                                     {comp.value && (
                                         <span style={{ color: '#999', fontWeight: 'normal', fontStyle: 'italic', marginLeft: '4px' }}>
-                                            ={comp.type === 'exact' ? (comp.value.length > 20 ? comp.value.substring(0, 20) + '...' : comp.value) : '*'}
+                                            {comp.type === 'exact' ? `=${comp.value.length > 20 ? comp.value.substring(0, 20) + '...' : comp.value}` : ' (any value)'}
                                         </span>
                                     )}
                                 </span>
@@ -208,7 +208,7 @@ export const PageTagging: React.FC = () => {
                                     }}
                                 >
                                     <option value="exact">Exact</option>
-                                    <option value="wildcard">Wildcard (*)</option>
+                                    <option value="wildcard">Any Value</option>
                                     <option value="exclude">Exclude</option>
                                 </select>
                             </div>

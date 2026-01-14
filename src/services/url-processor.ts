@@ -14,10 +14,10 @@ export interface URLQueryParam {
 }
 
 export interface URLHashComponent {
-    key: string; // The part before = or the whole thing if no =
-    value: string; // The part after = or empty
+    key: string;
+    value: string;
     type: 'exact' | 'wildcard' | 'exclude';
-    isBase?: boolean; // The first part before any ;
+    isBase?: boolean;
 }
 
 export interface URLRuleState {
@@ -161,26 +161,30 @@ export class URLProcessor {
 
         rule += activeSegments.join('/');
 
+        // Query parameters: ?key means match any value, ?key=value means match exact
         if (queryParams.length > 0) {
             const activeParams = queryParams
                 .filter(p => p.type !== 'exclude')
-                .map(p => `${p.key}=${p.type === 'wildcard' ? '*' : p.value}`);
+                .map(p => {
+                    if (p.type === 'wildcard') return p.key; // Official Pendo "any value" syntax
+                    return `${p.key}=${p.value}`;
+                });
 
             if (activeParams.length > 0) {
                 rule += `?${activeParams.join('&')}`;
             }
         }
 
+        // Hash components: normalize # to #! for path fragments
         const activeHash = hashComponents.filter(c => c.type !== 'exclude');
         if (activeHash.length > 0) {
-            rule += '#';
+            rule += '#!';
             const hashRuleParts = activeHash.map(c => {
-                if (c.isBase) return c.key;
-                const val = c.type === 'wildcard' ? '*' : c.value;
-                return c.value ? `${c.key}=${val}` : c.key;
+                if (c.isBase) return c.key.replace(/^#!?/, '');
+                if (c.type === 'wildcard') return c.key; // Match any value syntax
+                return c.value ? `${c.key}=${c.value}` : c.key;
             });
-            // Pendo rules usually preserve the structure. If base is included, it's first.
-            rule += hashRuleParts.join(';');
+            rule += hashRuleParts.filter(Boolean).join(';');
         }
 
         return rule;
