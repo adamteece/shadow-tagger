@@ -23,7 +23,19 @@ The Shadow Tagger Extension solves two major challenges in product analytics:
 - **Query Parameter Management**: Easily include, wildcard, or exclude specific query parameters.
 - **Pendo Syntax Validation**: Ensures all generated rules adhere to Pendo's official URL syntax.
 
-## 🛠 Installation
+## 🚀 Quick Install (Recommended)
+
+To get started immediately without installing developer tools:
+1. **[Download the latest release zip](https://github.com/adamteece/shadow-tagger/releases/latest)** (`shadow-tagger-extension.zip`).
+2. Unzip the file to a location on your computer.
+3. Load the extension in Chrome:
+   - Open Chrome and navigate to `chrome://extensions/`.
+   - Enable **Developer mode** (top right).
+   - Click **Load unpacked** and select the folder you just unzipped.
+
+## 🛠 Developer Setup
+
+If you want to contribute to the code or build it yourself:
 
 1. Clone this repository:
    ```bash
