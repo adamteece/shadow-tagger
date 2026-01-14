@@ -1,0 +1,29 @@
+{
+    "manifest_version": 3,
+    "name": "Shadow Tagger Extension",
+    "version": "1.0.0",
+    "description": "Tag features and pages in Shadow DOM with ease.",
+    "permissions": [
+        "activeTab"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "content.js"
+            ]
+        }
+    ],
+    "action": {
+        "default_title": "Shadow Tagger"
+    },
+    "icons": {
+        "48": "assets/icon48.png",
+        "128": "assets/icon128.png"
+    }
+}
