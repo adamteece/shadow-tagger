@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { URLProcessor, URLRuleState, URLSegment, URLQueryParam } from '../services/url-processor';
+import { URLProcessor, URLRuleState, URLSegment, URLQueryParam, URLHashComponent } from '../services/url-processor';
 
 export const PageTagging: React.FC = () => {
     const processor = useMemo(() => new URLProcessor(), []);
@@ -31,6 +31,12 @@ export const PageTagging: React.FC = () => {
         const newParams = [...state.queryParams];
         newParams[index].type = type;
         updateState({ queryParams: newParams });
+    };
+
+    const updateHashComponent = (index: number, type: URLHashComponent['type']) => {
+        const newHash = [...state.hashComponents];
+        newHash[index].type = type;
+        updateState({ hashComponents: newHash });
     };
 
     const generatedUrl = processor.generateRule(state);
@@ -98,7 +104,7 @@ export const PageTagging: React.FC = () => {
                                     padding: '2px 8px',
                                     background: seg.type === 'wildcard' ? '#0066ff11' : seg.type === 'ignore-after' ? '#ff336611' : 'white',
                                     border: `1px solid ${seg.type === 'wildcard' ? '#0066ff' : seg.type === 'ignore-after' ? '#ff3366' : '#ddd'}`,
-                                    borderRadius: seg.isMatrix ? '12px' : '4px', // Pill shape for matrix params
+                                    borderRadius: seg.isMatrix ? '12px' : '4px',
                                     cursor: 'pointer',
                                     fontSize: '12px',
                                     color: seg.type === 'wildcard' ? '#0066ff' : seg.type === 'ignore-after' ? '#ff3366' : '#333',
@@ -164,34 +170,50 @@ export const PageTagging: React.FC = () => {
             )}
 
             {/* Hash Section */}
-            {state.hashValue && (
+            {state.hashComponents.length > 0 && (
                 <section>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#666' }}>HASH / FRAGMENT</label>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <span style={{ fontSize: '10px', color: state.includeHash ? '#333' : '#999' }}>Include</span>
-                            <input
-                                type="checkbox"
-                                checked={state.includeHash}
-                                onChange={e => updateState({ includeHash: e.target.checked })}
-                                style={{ cursor: 'pointer' }}
-                            />
-                        </div>
+                    <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#666', marginBottom: '8px', display: 'block' }}>
+                        HASH / FRAGMENT COMPONENTS
+                    </label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {state.hashComponents.map((comp, i) => (
+                            <div key={i} style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                fontSize: '12px',
+                                background: comp.type === 'exclude' ? '#fff0f0' : '#fffdf8',
+                                padding: '6px 10px',
+                                borderRadius: '6px',
+                                border: `1px solid ${comp.type === 'exclude' ? '#ffdada' : '#ffe8cc'}`
+                            }}>
+                                <span style={{ fontWeight: 600, color: comp.type === 'exclude' ? '#cc0000' : '#854d0e' }}>
+                                    {comp.isBase ? '#' : ';'}{comp.key}
+                                    {comp.value && (
+                                        <span style={{ color: '#999', fontWeight: 'normal', fontStyle: 'italic', marginLeft: '4px' }}>
+                                            ={comp.type === 'exact' ? (comp.value.length > 20 ? comp.value.substring(0, 20) + '...' : comp.value) : '*'}
+                                        </span>
+                                    )}
+                                </span>
+                                <select
+                                    value={comp.type}
+                                    onChange={e => updateHashComponent(i, e.target.value as any)}
+                                    style={{
+                                        fontSize: '11px',
+                                        padding: '2px 4px',
+                                        borderRadius: '4px',
+                                        border: '1px solid #eee',
+                                        outline: 'none',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <option value="exact">Exact</option>
+                                    <option value="wildcard">Wildcard (*)</option>
+                                    <option value="exclude">Exclude</option>
+                                </select>
+                            </div>
+                        ))}
                     </div>
-                    {state.includeHash && (
-                        <div style={{
-                            fontSize: '12px',
-                            color: '#333',
-                            padding: '8px',
-                            background: '#fff9f0',
-                            borderRadius: '6px',
-                            border: '1px solid #ffe8cc',
-                            overflowX: 'auto',
-                            fontFamily: 'monospace'
-                        }}>
-                            #{state.hashValue}
-                        </div>
-                    )}
                 </section>
             )}
 
@@ -206,7 +228,7 @@ export const PageTagging: React.FC = () => {
                 </label>
                 <div style={{
                     background: '#333',
-                    color: '#00ff00', // Terminal aesthetic for the rule
+                    color: '#00ff00',
                     padding: '12px',
                     borderRadius: '8px',
                     fontSize: '13px',
@@ -221,7 +243,6 @@ export const PageTagging: React.FC = () => {
                 <button
                     onClick={() => {
                         navigator.clipboard.writeText(generatedUrl);
-                        // Optional: Show a "Copied!" feedback
                     }}
                     style={{
                         marginTop: '12px',

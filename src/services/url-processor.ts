@@ -13,13 +13,19 @@ export interface URLQueryParam {
     type: 'exact' | 'wildcard' | 'exclude';
 }
 
+export interface URLHashComponent {
+    key: string; // The part before = or the whole thing if no =
+    value: string; // The part after = or empty
+    type: 'exact' | 'wildcard' | 'exclude';
+    isBase?: boolean; // The first part before any ;
+}
+
 export interface URLRuleState {
     includeDomain: boolean;
     domainWildcard: boolean;
     pathSegments: URLSegment[];
     queryParams: URLQueryParam[];
-    includeHash: boolean;
-    hashValue: string;
+    hashComponents: URLHashComponent[];
 }
 
 export class URLProcessor {
@@ -33,16 +39,14 @@ export class URLProcessor {
     public analyzeUrl(urlStr: string): URLRuleState {
         const url = new URL(urlStr);
 
-        // Path segments: split by / then handle ; matrix params
+        // Path segments
         const rawPathSegments = url.pathname.split('/').filter(Boolean);
         const pathSegments: URLSegment[] = [];
 
         rawPathSegments.forEach(rawSeg => {
             if (rawSeg.includes(';')) {
                 const parts = rawSeg.split(';');
-                // The first part is the actual path segment name
                 pathSegments.push(this.createSegment(parts[0]));
-                // The rest are matrix parameters like key=value
                 for (let i = 1; i < parts.length; i++) {
                     const matrixSeg = this.createSegment(parts[i]);
                     matrixSeg.isMatrix = true;
@@ -63,18 +67,49 @@ export class URLProcessor {
             });
         });
 
+        // Hash components (Boomi-style: #base;key1=val1;key2=val2)
+        const hashComponents: URLHashComponent[] = [];
+        const fullHash = url.hash.replace(/^#/, '');
+        if (fullHash) {
+            const parts = fullHash.split(';');
+            // Base part
+            hashComponents.push({
+                key: parts[0],
+                value: '',
+                type: 'exact',
+                isBase: true
+            });
+            // Parameters
+            for (let i = 1; i < parts.length; i++) {
+                const segment = parts[i];
+                if (segment.includes('=')) {
+                    const [key, ...valParts] = segment.split('=');
+                    const value = valParts.join('=');
+                    hashComponents.push({
+                        key,
+                        value,
+                        type: this.isDynamic(value) ? 'wildcard' : 'exact'
+                    });
+                } else {
+                    hashComponents.push({
+                        key: segment,
+                        value: '',
+                        type: 'exact'
+                    });
+                }
+            }
+        }
+
         return {
             includeDomain: false,
             domainWildcard: true,
             pathSegments,
             queryParams,
-            includeHash: false,
-            hashValue: url.hash.replace(/^#/, '')
+            hashComponents
         };
     }
 
     private createSegment(val: string): URLSegment {
-        // If it's a matrix param like key=val, check only the val for dynamic
         const dynamicCheckVal = val.includes('=') ? val.split('=')[1] : val;
         const isDynamic = this.isDynamic(dynamicCheckVal);
 
@@ -86,11 +121,12 @@ export class URLProcessor {
     }
 
     private isDynamic(val: string): boolean {
+        if (!val) return false;
         return Object.values(this.patterns).some(pattern => pattern.test(val));
     }
 
     public generateRule(state: URLRuleState): string {
-        const { includeDomain, domainWildcard, pathSegments, queryParams, includeHash, hashValue } = state;
+        const { includeDomain, domainWildcard, pathSegments, queryParams, hashComponents } = state;
 
         let domainStr = '//*/';
         if (includeDomain) {
@@ -113,7 +149,6 @@ export class URLProcessor {
             }
 
             if (seg.isMatrix) {
-                // Append matrix param to the last path segment added
                 if (activeSegments.length > 0) {
                     activeSegments[activeSegments.length - 1] += `;${val}`;
                 } else {
@@ -136,8 +171,16 @@ export class URLProcessor {
             }
         }
 
-        if (includeHash && hashValue) {
-            rule += `#${hashValue}`;
+        const activeHash = hashComponents.filter(c => c.type !== 'exclude');
+        if (activeHash.length > 0) {
+            rule += '#';
+            const hashRuleParts = activeHash.map(c => {
+                if (c.isBase) return c.key;
+                const val = c.type === 'wildcard' ? '*' : c.value;
+                return c.value ? `${c.key}=${val}` : c.key;
+            });
+            // Pendo rules usually preserve the structure. If base is included, it's first.
+            rule += hashRuleParts.join(';');
         }
 
         return rule;
