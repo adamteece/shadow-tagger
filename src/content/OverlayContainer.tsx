@@ -13,17 +13,49 @@ export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
     const [lastSelector, setLastSelector] = useState('');
     const [breadcrumbs, setBreadcrumbs] = useState<string[]>([]);
     const [isInsideShadow, setIsInsideShadow] = useState(false);
-    const [options, setOptions] = useState({
-        prioritizeDataTestId: true,
-        prioritizeAriaLabel: true,
+    const [options, setOptions] = useState<any>({
+        priorityAttributes: ['data-testid', 'data-pendo-id', 'aria-label'],
         prioritizeIds: true
     });
+    const [newAttr, setNewAttr] = useState('');
+
+    useEffect(() => {
+        // Load settings from storage on mount
+        chrome.storage.local.get(['selectorOptions'], (result) => {
+            if (result.selectorOptions) {
+                setOptions(result.selectorOptions);
+                inspector.setOptions(result.selectorOptions);
+            }
+        });
+    }, [inspector]);
+
+    const updateOptions = (newOptions: any) => {
+        setOptions(newOptions);
+        inspector.setOptions(newOptions);
+        chrome.storage.local.set({ selectorOptions: newOptions });
+    };
+
+    const addAttribute = () => {
+        if (!newAttr.trim()) return;
+        const newAttrs = [...options.priorityAttributes];
+        if (!newAttrs.includes(newAttr.trim())) {
+            newAttrs.push(newAttr.trim());
+            updateOptions({ ...options, priorityAttributes: newAttrs });
+        }
+        setNewAttr('');
+    };
+
+    const removeAttribute = (attr: string) => {
+        const newAttrs = options.priorityAttributes.filter((a: string) => a !== attr);
+        updateOptions({ ...options, priorityAttributes: newAttrs });
+    };
+
     const draggingRef = useRef(false);
     const offsetRef = useRef({ x: 0, y: 0 });
 
     const handleMouseDown = (e: React.MouseEvent) => {
-        // Prevent dragging when clicking buttons
-        if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+        // Prevent dragging when clicking buttons or inputs
+        if (['BUTTON', 'INPUT'].includes((e.target as HTMLElement).tagName)) return;
         draggingRef.current = true;
         offsetRef.current = {
             x: e.clientX - position.x,
@@ -136,7 +168,7 @@ export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
                 </button>
             </div>
 
-            <div style={{ padding: '16px' }}>
+            <div style={{ padding: '16px', maxHeight: '500px', overflowY: 'auto' }}>
                 {activeTab === 'feature' ? (
                     <>
                         <button
@@ -151,36 +183,86 @@ export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
                                 cursor: 'pointer',
                                 fontWeight: '600',
                                 transition: 'background 0.2s',
-                                marginBottom: '12px'
+                                marginBottom: '16px'
                             }}
                         >
                             {isInspectorActive ? 'Cancel Inspect' : 'Inspect Element'}
                         </button>
 
                         <div style={{ marginBottom: '16px' }}>
-                            <label style={{ fontSize: '11px', color: '#666', display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                                <input
-                                    type="checkbox"
-                                    checked={options.prioritizeDataTestId}
-                                    onChange={(e) => {
-                                        const newOpts = { ...options, prioritizeDataTestId: e.target.checked };
-                                        setOptions(newOpts);
-                                        inspector.setOptions(newOpts);
-                                    }}
-                                />
-                                Prioritize data-testid
+                            <label style={{ fontSize: '12px', fontWeight: '600', color: '#444', marginBottom: '8px', display: 'block' }}>
+                                Priority Attributes
                             </label>
-                            <label style={{ fontSize: '11px', color: '#666', display: 'flex', gap: '8px' }}>
+
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+                                {options.priorityAttributes.map((attr: string) => (
+                                    <span key={attr} style={{
+                                        background: '#eef',
+                                        color: '#0066ff',
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        fontSize: '11px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        border: '1px solid #cce0ff'
+                                    }}>
+                                        {attr}
+                                        <button
+                                            onClick={() => removeAttribute(attr)}
+                                            style={{
+                                                border: 'none',
+                                                background: 'none',
+                                                color: '#ff3366',
+                                                cursor: 'pointer',
+                                                padding: '0 2px',
+                                                fontSize: '14px',
+                                                lineHeight: 1
+                                            }}
+                                        >×</button>
+                                    </span>
+                                ))}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                    type="text"
+                                    value={newAttr}
+                                    onChange={(e) => setNewAttr(e.target.value)}
+                                    placeholder="Add attribute (e.g. data-testid)"
+                                    style={{
+                                        flex: 1,
+                                        padding: '6px 10px',
+                                        fontSize: '12px',
+                                        border: '1px solid #ddd',
+                                        borderRadius: '4px',
+                                        outline: 'none'
+                                    }}
+                                    onKeyDown={(e) => e.key === 'Enter' && addAttribute()}
+                                />
+                                <button
+                                    onClick={addAttribute}
+                                    style={{
+                                        background: '#0066ff',
+                                        color: 'white',
+                                        border: 'none',
+                                        padding: '4px 12px',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontSize: '12px'
+                                    }}
+                                >
+                                    Add
+                                </button>
+                            </div>
+
+                            <label style={{ fontSize: '11px', color: '#666', display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center' }}>
                                 <input
                                     type="checkbox"
-                                    checked={options.prioritizeAriaLabel}
-                                    onChange={(e) => {
-                                        const newOpts = { ...options, prioritizeAriaLabel: e.target.checked };
-                                        setOptions(newOpts);
-                                        inspector.setOptions(newOpts);
-                                    }}
+                                    checked={options.prioritizeIds}
+                                    onChange={(e) => updateOptions({ ...options, prioritizeIds: e.target.checked })}
                                 />
-                                Prioritize aria-label
+                                Prioritize unique IDs
                             </label>
                         </div>
 

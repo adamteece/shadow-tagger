@@ -6,8 +6,7 @@ export interface SelectorResult {
 }
 
 export interface SelectorOptions {
-    prioritizeDataTestId: boolean;
-    prioritizeAriaLabel: boolean;
+    priorityAttributes: string[];
     prioritizeIds: boolean;
 }
 
@@ -15,8 +14,7 @@ export class SelectorEngine {
     public options: SelectorOptions;
 
     constructor(options: SelectorOptions = {
-        prioritizeDataTestId: true,
-        prioritizeAriaLabel: true,
+        priorityAttributes: ['data-testid', 'data-pendo-id', 'aria-label'],
         prioritizeIds: true
     }) {
         this.options = options;
@@ -66,9 +64,6 @@ export class SelectorEngine {
     }
 
     private getComposedPath(element: HTMLElement): Node[] {
-        // If the browser supports composedPath on events, we can trigger a dummy event
-        // but better to just traverse manually or use a helper if available.
-        // For now, let's use a manual traversal to handle shadow roots correctly.
         const path: Node[] = [];
         let current: Node | null = element;
 
@@ -87,10 +82,10 @@ export class SelectorEngine {
     }
 
     private getBestBaseSelector(element: HTMLElement): string {
-        // 1. Data attributes (data-pendo-id, data-testid)
-        if (this.options.prioritizeDataTestId) {
-            const testId = element.getAttribute('data-testid') || element.getAttribute('data-pendo-id');
-            if (testId) return `[data-testid="${testId}"]`;
+        // 1. Custom priority attributes
+        for (const attr of this.options.priorityAttributes) {
+            const val = element.getAttribute(attr);
+            if (val) return `[${attr}="${val}"]`;
         }
 
         // 2. IDs (check for dynamic patterns)
@@ -98,13 +93,7 @@ export class SelectorEngine {
             return `#${element.id}`;
         }
 
-        // 3. ARIA labels
-        if (this.options.prioritizeAriaLabel) {
-            const ariaLabel = element.getAttribute('aria-label');
-            if (ariaLabel) return `[aria-label="${ariaLabel}"]`;
-        }
-
-        // 4. Tag + Class (filter dynamic classes)
+        // 3. Tag + Class (filter dynamic classes)
         const tagName = element.tagName.toLowerCase();
         const className = Array.from(element.classList)
             .filter(c => !this.isDynamicClass(c))
@@ -112,17 +101,15 @@ export class SelectorEngine {
 
         if (className) return `${tagName}.${className}`;
 
-        // 5. Fallback to Tag
+        // 4. Fallback to Tag
         return tagName;
     }
 
     private isDynamicId(id: string): boolean {
-        // Basic heuristic for dynamic IDs (numbers, long hex, etc.)
         return /\d{5,}/.test(id) || /^[0-9a-f]{8,}/i.test(id);
     }
 
     private isDynamicClass(cls: string): boolean {
-        // Common CSS-in-JS patterns (sc-, css-, etc.)
         return /^sc-/.test(cls) || /^css-/.test(cls) || cls.length > 20;
     }
 }
