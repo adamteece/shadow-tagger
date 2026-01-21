@@ -1,6 +1,7 @@
 export class Highlighter {
     private hoverOverlay: HTMLElement;
     private selectionOverlays: HTMLElement[] = [];
+    private currentSelectionElements: Element[] = [];
 
     constructor() {
         this.hoverOverlay = this.createOverlay('#00aaff', 'rgba(0, 170, 255, 0.1)');
@@ -14,7 +15,7 @@ export class Highlighter {
             zIndex: '2147483647',
             border: `2px solid ${borderColor}`,
             backgroundColor: bgColor,
-            transition: 'all 0.1s ease-out',
+            transition: 'all 0.05s ease-out',
             display: 'none',
             boxSizing: 'border-box',
             borderRadius: '2px'
@@ -23,7 +24,7 @@ export class Highlighter {
         return overlay;
     }
 
-    public highlight(element: HTMLElement) {
+    public highlight(element: Element) {
         this.positionOverlay(this.hoverOverlay, element);
     }
 
@@ -31,10 +32,14 @@ export class Highlighter {
         this.hoverOverlay.style.display = 'none';
     }
 
-    public highlightSelection(elements: HTMLElement[]) {
-        this.clearSelection();
+    public highlightSelection(elements: Element[]) {
+        this.currentSelectionElements = elements;
+        this.refresh();
+    }
 
-        elements.forEach((el, i) => {
+    public refresh() {
+        this.clearOverlays();
+        this.currentSelectionElements.forEach((el, i) => {
             let overlay = this.selectionOverlays[i];
             if (!overlay) {
                 overlay = this.createOverlay('#4488ff', 'rgba(68, 136, 255, 0.2)');
@@ -45,12 +50,17 @@ export class Highlighter {
     }
 
     public clearSelection() {
+        this.currentSelectionElements = [];
+        this.clearOverlays();
+    }
+
+    private clearOverlays() {
         this.selectionOverlays.forEach(overlay => {
             overlay.style.display = 'none';
         });
     }
 
-    private positionOverlay(overlay: HTMLElement, element: HTMLElement) {
+    private positionOverlay(overlay: HTMLElement, element: Element) {
         const rect = element.getBoundingClientRect();
         Object.assign(overlay.style, {
             top: `${rect.top}px`,
