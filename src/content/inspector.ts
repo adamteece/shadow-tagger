@@ -28,6 +28,10 @@ export class Inspector {
         return this.engine;
     }
 
+    public getHighlighter(): Highlighter {
+        return this.highlighter;
+    }
+
 
     public activate(callback: (analysis: InspectorAnalysis) => void) {
         this.isActive = true;

@@ -249,6 +249,89 @@ export class SelectorEngine {
         return parts.join(' ');
     }
 
+    /**
+     * Queries for elements matching a Pendo selector, which may contain ::shadow.
+     */
+    public queryPendoSelector(selector: string): Element[] {
+        if (!selector) return [];
+
+        console.log(`[ShadowTagger] Resolving selector: ${selector}`);
+
+        // Split by ::shadow and clean up segments
+        const segments = selector.split('::shadow').map(s => s.trim()).filter(Boolean);
+        if (segments.length === 0) return [];
+
+        // 1. Resolve the first segment across ALL shadow roots in the document
+        let currentMatches = this.queryAllDeep(document, segments[0]);
+        console.log(`[ShadowTagger] Segment 0 ("${segments[0]}") matches: ${currentMatches.length}`);
+
+        // 2. Resolve subsequent segments
+        for (let i = 1; i < segments.length; i++) {
+            const segment = segments[i];
+            const nextMatches: Element[] = [];
+
+            for (const el of currentMatches) {
+                const found = this.queryAllDeepInsideShadows(el, segment);
+                if (found.length === 0) {
+                    console.log(`[ShadowTagger] Segment ${i} ("${segment}") returned 0 matches for element:`, el);
+                    console.log(`[ShadowTagger] Has shadowRoot: ${!!el.shadowRoot}`);
+                }
+                nextMatches.push(...found);
+            }
+
+            currentMatches = Array.from(new Set(nextMatches));
+            console.log(`[ShadowTagger] Segment ${i} ("${segment}") results: ${currentMatches.length} matches`);
+            if (currentMatches.length === 0) {
+                console.warn(`[ShadowTagger] Search stopped at segment ${i} ("${segment}")`);
+                break;
+            }
+        }
+
+        return currentMatches;
+    }
+
+    /**
+     * Finds elements matching a selector within any shadow roots found at or below the given element.
+     */
+    private queryAllDeepInsideShadows(el: Element, selector: string): Element[] {
+        // PERMISSIVE: First, try to find the segment in the current element's light DOM
+        // because sometimes ::shadow is used loosely to mean "descendant including boundary crossing".
+        const results: Element[] = Array.from(el.querySelectorAll(selector));
+
+        // 1. Check if the element itself has a shadow root
+        if (el.shadowRoot) {
+            results.push(...this.queryAllDeep(el.shadowRoot, selector));
+        }
+
+        // 2. Check all descendants for shadow roots
+        const descendants = el.querySelectorAll('*');
+        for (const desc of Array.from(descendants)) {
+            if (desc.shadowRoot) {
+                results.push(...this.queryAllDeep(desc.shadowRoot, selector));
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * Recursively searches through the entire DOM tree starting from root, 
+     * including piercing into all child shadow roots.
+     */
+    private queryAllDeep(root: Document | ShadowRoot, selector: string): Element[] {
+        let results: Element[] = Array.from(root.querySelectorAll(selector));
+
+        // Find all elements that have a shadowRoot to pierce further
+        const allElements = root.querySelectorAll('*');
+        for (const el of Array.from(allElements)) {
+            if (el.shadowRoot) {
+                results.push(...this.queryAllDeep(el.shadowRoot, selector));
+            }
+        }
+
+        return Array.from(new Set(results));
+    }
+
 
 
     private getComposedPath(element: HTMLElement): Node[] {

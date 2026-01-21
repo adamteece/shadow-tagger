@@ -19,6 +19,7 @@ export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
     const [isInsideShadow, setIsInsideShadow] = useState(false);
     const [selectorPath, setSelectorPath] = useState<ElementNode[]>([]);
     const [selectedNodeIndex, setSelectedNodeIndex] = useState<number>(0);
+    const [matchCount, setMatchCount] = useState<number>(0);
     const [options, setOptions] = useState<any>({
         priorityAttributes: ['data-testid', 'data-pendo-id', 'aria-label'],
         prioritizeIds: true
@@ -70,6 +71,31 @@ export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
     const draggingRef = useRef(false);
     const offsetRef = useRef({ x: 0, y: 0 });
 
+    useEffect(() => {
+        if (lastSelector) {
+            const matches = inspector.getEngine().queryPendoSelector(lastSelector);
+            setMatchCount(matches.length);
+            inspector.getHighlighter().highlightSelection(matches);
+        } else {
+            setMatchCount(0);
+            inspector.getHighlighter().clearSelection();
+        }
+    }, [lastSelector, inspector]);
+
+    useEffect(() => {
+        const handleUpdate = () => {
+            inspector.getHighlighter().refresh();
+        };
+
+        window.addEventListener('scroll', handleUpdate, { capture: true, passive: true });
+        window.addEventListener('resize', handleUpdate);
+
+        return () => {
+            window.removeEventListener('scroll', handleUpdate, { capture: true });
+            window.removeEventListener('resize', handleUpdate);
+        };
+    }, [inspector]);
+
     const handleMouseDown = (e: React.MouseEvent) => {
         // Prevent dragging when clicking buttons or inputs
         if (['BUTTON', 'INPUT', 'SPAN', 'DIV'].includes((e.target as HTMLElement).tagName) &&
@@ -111,6 +137,9 @@ export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
             inspector.deactivate();
             setIsInspectorActive(false);
         } else {
+            // Clear any existing selection highlights when starting new inspection
+            inspector.getHighlighter().clearSelection();
+
             inspector.activate((analysis) => {
                 setLastSelector(analysis.selector);
                 setBreadcrumbs(analysis.breadcrumbs);
@@ -450,6 +479,11 @@ export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
                                 >
                                     {lastSelector}
                                 </div>
+
+                                <div style={{ fontSize: '11px', color: '#666', marginTop: '6px', textAlign: 'right' }}>
+                                    Matching elements: {matchCount}
+                                </div>
+
                                 <button
                                     onClick={() => navigator.clipboard.writeText(lastSelector)}
                                     style={{
@@ -470,6 +504,7 @@ export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
                                     onClick={() => {
                                         setSelectorPath([]);
                                         setLastSelector('');
+                                        inspector.getHighlighter().clearSelection();
                                     }}
                                     style={{
                                         marginTop: '8px',
