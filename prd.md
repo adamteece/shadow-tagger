@@ -71,7 +71,11 @@ app-shell::shadow side-nav::shadow item-link
 | //\* | Domain wildcard (matches any environment) | //\*/pricing |
 | \* | Single segment wildcard | //\*/users/\*/settings |
 | \*\* | Ignore everything after this point | //\*/devDocs/docs/Changelog/\*\* |
-| ?param=\* | Query parameter with any value | //\*/search?q=\* |
+| ?param | Query parameter with any value (omit value) | //\*/search?q |
+| ?param=value | Query parameter with exact value | //\*/filter?status=active |
+| /segment;matrix | Matrix parameter in path segment | //\*/products;category=\* |
+| #base;key | Hash component with any value | //\*/#!build;accountId |
+| #base;key=value | Hash component with exact value | //\*/#!view;tab=settings |
 | \~contains:text | URL must contain specified text | //\*/\*/\~contains:dashboard |
 
 ### **Output Examples**
@@ -95,10 +99,34 @@ app-shell::shadow side-nav::shadow item-link
 | Component | Behavior |
 | :---- | :---- |
 | Inspector Toggle | Activates element selection mode; cursor becomes crosshair |
-| Live Breadcrumbs | Shows DOM hierarchy: html \> body \> app-root \> ::shadow \> navbar |
-| Selector Preview | Displays generated selector with copy button |
-| Attribute Settings | Checkboxes to prioritize data-testid, aria-label, etc. |
+| Ancestor Tree Navigator | Clickable visual path from selected element up to root; click any ancestor to include in selector |
+| Element Detail Panel | Shows ALL available identifiers for hovered/selected element (see below) |
+| Selector Chips | Toggleable chips for each identifier type; user picks what to include |
+| Live Selector Preview | Real-time preview updates as user toggles options; includes copy button |
+| Custom Attribute Settings | User-defined list of priority HTML attributes (data-testid, data-locator, etc.) |
 | Shadow Alert Badge | "SHADOW DOM DETECTED" indicator when inside shadow root |
+
+### **Element Detail Panel Contents**
+
+For each element, the panel displays all available identifiers:
+
+| Identifier Type | Example | Notes |
+| :---- | :---- | :---- |
+| Tag Name | button, div, my-component | Always shown |
+| ID | #submit-btn | Warns if dynamic pattern detected |
+| Classes | .btn, .primary-action | Filters CSS-in-JS classes (sc-*, css-*) |
+| data-* Attributes | [data-testid="submit"] | All data attributes shown |
+| aria-* Attributes | [aria-label="Close"] | Accessibility attributes |
+| Other Attributes | [role="button"], [type="submit"] | role, name, title, type, etc. |
+| Position | :nth-of-type(2), :nth-child(3) | Structural fallback options |
+
+### **Selector Composition**
+
+Users can compose selectors by:
+
+1. **Navigating ancestors:** Click any element in the ancestor tree to include it as a parent selector  
+2. **Toggling identifiers:** Enable/disable individual chips (ID, class, attribute) for each element  
+3. **Combining options:** Build precise selectors like `my-component::shadow button.primary[data-testid="submit"]`
 
 ## **4.2 Page Tagging Tab**
 
@@ -133,8 +161,10 @@ app-shell::shadow side-nav::shadow item-link
 | :---- | :---- |
 | Closed Shadow Roots | Display warning; generate selector for Shadow Host only (deepest accessible node) |
 | Dynamic Classes (CSS-in-JS) | Entropy detection excludes high-entropy classes (e.g., .sc-bdVaJa); warning displayed |
-| iFrames | Alert user; generate selector relative to iFrame root, not top window |
+| iFrames (Same-Origin) | Alert user; generate selector relative to iFrame root, not top window |
+| iFrames (Cross-Origin) | Cannot access; display error explaining browser security restriction |
 | Slotted Content | Default to Light DOM selector; toggle available to target slot container |
+| Web Workers | Not applicable; Web Workers have no DOM access |
 
 # **Appendix A: Test Scenarios**
 
@@ -154,11 +184,14 @@ app-shell::shadow side-nav::shadow item-link
 
 | ID | Scenario | Expected Output |
 | :---- | :---- | :---- |
-| URL-001 | Simple path | //\*/pricing |
-| URL-002 | UUID in path | //\*/account/\*/details |
-| URL-003 | Query param (UTM) | //\*/landing (UTM stripped) |
-| URL-004 | Query param (state) | //\*/search?q=\* |
-| URL-005 | Hash routing (/\#/path) | //\*/\#\!/\*/dashboard |
+| URL-001 | Simple path | //\\*/pricing |
+| URL-002 | UUID in path | //\\*/account/\\*/details |
+| URL-003 | Query param (UTM) | //\\*/landing (UTM stripped) |
+| URL-004 | Query param (any value) | //\\*/search?q |
+| URL-005 | Query param (exact value) | //\\*/filter?status=active |
+| URL-006 | Hash routing (/\\#/path) | //\\*/\\#\\!/\\*/dashboard |
+| URL-007 | Matrix parameters | //\\*/products;category |
+| URL-008 | Hash with params | //\\*/#!build;accountId |
 
 # **Appendix B: Dynamic Segment Detection Patterns**
 
@@ -166,15 +199,37 @@ The extension uses these regex patterns to identify likely dynamic URL segments:
 
 | Pattern Type | Regex | Example Match |
 | :---- | :---- | :---- |
-| UUID/GUID | \[0-9a-f\]{8}-\[0-9a-f\]{4}-\[0-9a-f\]{4}-\[0-9a-f\]{4}-\[0-9a-f\]{12} | a987fbc9-4bed-3078-cf07-9141ba07c9f3 |
-| MongoDB ObjectId | \[0-9a-f\]{24} | 507f1f77bcf86cd799439011 |
-| Numeric ID | ^\\d+$ | 123456 |
-| Base64/Short ID | \[A-Za-z0-9\_-\]{20,} | dGhpcyBpcyBhIHRlc3Q |
+| UUID/GUID | \\[0-9a-f\\]{8}-\\[0-9a-f\\]{4}-\\[0-9a-f\\]{4}-\\[0-9a-f\\]{4}-\\[0-9a-f\\]{12} | a987fbc9-4bed-3078-cf07-9141ba07c9f3 |
+| MongoDB ObjectId | \\[0-9a-f\\]{24} | 507f1f77bcf86cd799439011 |
+| Numeric ID | ^\\\\d+$ | 123456 |
+| Base64/Short ID | \\[A-Za-z0-9\\_-\\]{20,} | dGhpcyBpcyBhIHRlc3Q |
+
+# **Appendix C: Interactive Selector Builder Test Scenarios**
+
+| ID | Scenario | Expected Behavior |
+| :---- | :---- | :---- |
+| SEL-001 | Navigate to parent element | Ancestor tree highlights parent; selector updates to include parent |
+| SEL-002 | Toggle ID chip on | Selector includes #element-id |
+| SEL-003 | Toggle multiple classes | Selector includes .class1.class2 |
+| SEL-004 | Add data-testid attribute | Selector includes [data-testid="value"] |
+| SEL-005 | Combine ancestor + chips | my-component::shadow button.primary[aria-label="Submit"] |
+| SEL-006 | Deselect all chips | Shows warning: "No selectors chosen" |
+| SEL-007 | Dynamic ID detection | ID chip shows warning icon; not auto-selected |
 
 # **References**
 
-3. Pendo Support: Tag Features in a shadow DOM \- https://support.pendo.io/hc/en-us/articles/360038410952  
-4. Pendo Support: URLs for Page tagging \- https://support.pendo.io/hc/en-us/articles/360032293371  
-5. Pendo Support: Advanced Feature tagging \- https://support.pendo.io/hc/en-us/articles/360031950112  
-6. Pendo Support: Using CSS selectors in Feature tagging \- https://support.pendo.io/hc/en-us/articles/360031863612  
-7. MDN Web Docs: Using shadow DOM \- https://developer.mozilla.org/en-US/docs/Web/API/Web\_components/Using\_shadow\_DOM
+1. Pendo Support: Tag Features in a shadow DOM - https://support.pendo.io/hc/en-us/articles/360038410952  
+2. Pendo Support: URLs for Page tagging - https://support.pendo.io/hc/en-us/articles/360032293371  
+3. Pendo Support: Advanced Feature tagging - https://support.pendo.io/hc/en-us/articles/360031950112  
+4. Pendo Support: Using CSS selectors in Feature tagging - https://support.pendo.io/hc/en-us/articles/360031863612  
+5. MDN Web Docs: Using shadow DOM - https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_shadow_DOM
+
+---
+
+# **Changelog**
+
+| Version | Date | Changes |
+| :---- | :---- | :---- |
+| 1.2.0 | 2026-01-21 | Added Interactive Selector Builder feature (§4.1): Ancestor Tree Navigator, Element Detail Panel, Selector Chips, Selector Composition. Updated URL Syntax Reference with correct Pendo query param syntax, matrix parameters, and hash component handling. Expanded Known Limitations (§6) with cross-origin iframe and web worker notes. Added Appendix C for selector builder test scenarios. |
+| 1.1.0 | 2026-01-14 | Added custom HTML attribute settings (replacing fixed checkboxes). Enhanced hash fragment parsing for Boomi-style semicolon syntax. Improved Advanced URL Rule Builder with granular hash component controls. |
+| 1.0.0 | Initial | Initial PRD release with Feature Tagging (Shadow DOM Inspector) and Page Tagging (URL Normalizer) modules. |
