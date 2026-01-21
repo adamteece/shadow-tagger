@@ -10,4 +10,4 @@ Error generating stack: `+e.message+`
     :host {
       all: initial;
     }
-  `,A.appendChild(d);const X=new ov;uv.createRoot(D).render(_.jsx(fv,{inspector:X})),chrome.runtime.onMessage.addListener(K=>{K.type==="TOGGLE_OVERLAY"&&(x.style.display=x.style.display==="none"?"block":"none")})};dv();console.log("Shadow Tagger Content Script Injected");
+  `,E.appendChild(d);const q=new oh;uh.createRoot(O).render(x.jsx(ch,{inspector:q})),chrome.runtime.onMessage.addListener(Y=>{Y.type==="TOGGLE_OVERLAY"&&(_.style.display=_.style.display==="none"?"block":"none")})};dh();console.log("Shadow Tagger Content Script Injected");
