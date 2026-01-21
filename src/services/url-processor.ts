@@ -63,7 +63,7 @@ export class URLProcessor {
             queryParams.push({
                 key,
                 value,
-                type: 'wildcard'
+                type: this.isDynamic(value) ? 'wildcard' : 'exact'
             });
         });
 
