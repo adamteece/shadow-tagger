@@ -249,6 +249,49 @@ export class SelectorEngine {
         return parts.join(' ');
     }
 
+    /**
+     * Queries for elements matching a Pendo selector, which may contain ::shadow.
+     */
+    public queryPendoSelector(selector: string): HTMLElement[] {
+        if (!selector) return [];
+
+        // Split by ::shadow to handle multiple levels
+        const segments = selector.split('::shadow').map(s => s.trim()).filter(Boolean);
+
+        if (segments.length === 0) return [];
+
+        let currentRoots: (Document | ShadowRoot)[] = [document];
+        let matches: HTMLElement[] = [];
+
+        for (let i = 0; i < segments.length; i++) {
+            const segment = segments[i];
+            const nextMatches: HTMLElement[] = [];
+
+            for (const root of currentRoots) {
+                try {
+                    const found = root.querySelectorAll(segment);
+                    found.forEach(el => nextMatches.push(el as HTMLElement));
+                } catch (e) {
+                    console.error(`Invalid selector segment: ${segment}`, e);
+                }
+            }
+
+            if (i === segments.length - 1) {
+                // Last segment, these are our final matches
+                matches = nextMatches;
+            } else {
+                // Not the last segment, so each match must have a shadowRoot to continue
+                currentRoots = nextMatches
+                    .map(el => el.shadowRoot)
+                    .filter((sr): sr is ShadowRoot => sr !== null);
+
+                if (currentRoots.length === 0) break;
+            }
+        }
+
+        return matches;
+    }
+
 
 
     private getComposedPath(element: HTMLElement): Node[] {

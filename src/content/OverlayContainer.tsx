@@ -70,6 +70,15 @@ export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
     const draggingRef = useRef(false);
     const offsetRef = useRef({ x: 0, y: 0 });
 
+    useEffect(() => {
+        if (lastSelector) {
+            const matches = inspector.getEngine().queryPendoSelector(lastSelector);
+            inspector.getHighlighter().highlightSelection(matches);
+        } else {
+            inspector.getHighlighter().clearSelection();
+        }
+    }, [lastSelector, inspector]);
+
     const handleMouseDown = (e: React.MouseEvent) => {
         // Prevent dragging when clicking buttons or inputs
         if (['BUTTON', 'INPUT', 'SPAN', 'DIV'].includes((e.target as HTMLElement).tagName) &&
@@ -111,6 +120,9 @@ export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
             inspector.deactivate();
             setIsInspectorActive(false);
         } else {
+            // Clear any existing selection highlights when starting new inspection
+            inspector.getHighlighter().clearSelection();
+
             inspector.activate((analysis) => {
                 setLastSelector(analysis.selector);
                 setBreadcrumbs(analysis.breadcrumbs);
@@ -450,6 +462,11 @@ export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
                                 >
                                     {lastSelector}
                                 </div>
+
+                                <div style={{ fontSize: '11px', color: '#666', marginTop: '6px', textAlign: 'right' }}>
+                                    Matching elements: {inspector.getEngine().queryPendoSelector(lastSelector).length}
+                                </div>
+
                                 <button
                                     onClick={() => navigator.clipboard.writeText(lastSelector)}
                                     style={{
@@ -470,6 +487,7 @@ export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
                                     onClick={() => {
                                         setSelectorPath([]);
                                         setLastSelector('');
+                                        inspector.getHighlighter().clearSelection();
                                     }}
                                     style={{
                                         marginTop: '8px',
