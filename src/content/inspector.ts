@@ -1,11 +1,18 @@
-import { SelectorEngine, SelectorOptions } from '../services/selector-engine';
+import { SelectorEngine, SelectorOptions, ElementNode } from '../services/selector-engine';
 import { Highlighter } from './highlighter';
+
+export interface InspectorAnalysis {
+    selector: string;
+    breadcrumbs: string[];
+    isInsideShadow: boolean;
+    path: ElementNode[];
+}
 
 export class Inspector {
     private engine: SelectorEngine;
     private highlighter: Highlighter;
     private isActive: boolean = false;
-    private onElementSelected?: (analysis: { selector: string, breadcrumbs: string[], isInsideShadow: boolean }) => void;
+    private onElementSelected?: (analysis: InspectorAnalysis) => void;
 
     constructor() {
         this.engine = new SelectorEngine();
@@ -17,7 +24,12 @@ export class Inspector {
         this.engine.setOptions(options);
     }
 
-    public activate(callback: (analysis: { selector: string, breadcrumbs: string[], isInsideShadow: boolean }) => void) {
+    public getEngine(): SelectorEngine {
+        return this.engine;
+    }
+
+
+    public activate(callback: (analysis: InspectorAnalysis) => void) {
         this.isActive = true;
         this.onElementSelected = callback;
         document.body.style.cursor = 'crosshair';
@@ -48,10 +60,15 @@ export class Inspector {
             const target = e.composedPath()[0] as HTMLElement;
             if (target && target instanceof HTMLElement) {
                 const analysis = this.engine.getAnalysis(target);
+                const path = this.engine.buildPath(target);
                 if (this.onElementSelected) {
-                    this.onElementSelected(analysis);
+                    this.onElementSelected({
+                        ...analysis,
+                        path
+                    });
                 }
             }
         }, { capture: true });
     }
 }
+
