@@ -255,15 +255,12 @@ export class SelectorEngine {
     public queryPendoSelector(selector: string): Element[] {
         if (!selector) return [];
 
-        console.log(`[ShadowTagger] Resolving selector: ${selector}`);
-
         // Split by ::shadow and clean up segments
         const segments = selector.split('::shadow').map(s => s.trim()).filter(Boolean);
         if (segments.length === 0) return [];
 
         // 1. Resolve the first segment across ALL shadow roots in the document
         let currentMatches = this.queryAllDeep(document, segments[0]);
-        console.log(`[ShadowTagger] Segment 0 ("${segments[0]}") matches: ${currentMatches.length}`);
 
         // 2. Resolve subsequent segments
         for (let i = 1; i < segments.length; i++) {
@@ -272,17 +269,11 @@ export class SelectorEngine {
 
             for (const el of currentMatches) {
                 const found = this.queryAllDeepInsideShadows(el, segment);
-                if (found.length === 0) {
-                    console.log(`[ShadowTagger] Segment ${i} ("${segment}") returned 0 matches for element:`, el);
-                    console.log(`[ShadowTagger] Has shadowRoot: ${!!el.shadowRoot}`);
-                }
                 nextMatches.push(...found);
             }
 
             currentMatches = Array.from(new Set(nextMatches));
-            console.log(`[ShadowTagger] Segment ${i} ("${segment}") results: ${currentMatches.length} matches`);
             if (currentMatches.length === 0) {
-                console.warn(`[ShadowTagger] Search stopped at segment ${i} ("${segment}")`);
                 break;
             }
         }
