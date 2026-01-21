@@ -215,6 +215,10 @@ The extension uses these regex patterns to identify likely dynamic URL segments:
 | SEL-005 | Combine ancestor + chips | my-component::shadow button.primary[aria-label="Submit"] |
 | SEL-006 | Deselect all chips | Shows warning: "No selectors chosen" |
 | SEL-007 | Dynamic ID detection | ID chip shows warning icon; not auto-selected |
+| SEL-008 | Generic element in unique container | Select generic button, navigate to modal with unique ID, result: `#modal-dialog [data-locator="button-ok"]` |
+| SEL-009 | Skip intermediate ancestors | Select deeply nested element, include only grandparent (not direct parent), result: `#container button` (skips middle div) |
+| SEL-010 | Shadow DOM child + Light DOM ancestor | Select element inside Shadow DOM, navigate out to Light DOM container, result: `#modal-dialog button::shadow [data-locator="button-ok"]` |
+| SEL-011 | Nested Shadow DOM + Light DOM ancestor | Select element in deeply nested Shadow DOM, include Light DOM grandparent, result: `#app-container outer-component::shadow inner-component::shadow button` |
 
 # **References**
 
