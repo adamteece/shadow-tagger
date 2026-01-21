@@ -8,7 +8,10 @@ interface OverlayProps {
 
 export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
     const [activeTab, setActiveTab] = useState<'feature' | 'page'>('feature');
-    const [position, setPosition] = useState({ x: 20, y: 20 });
+    const [position, setPosition] = useState(() => ({
+        x: Math.max(20, window.innerWidth - 340),
+        y: 20
+    }));
     const [isInspectorActive, setIsInspectorActive] = useState(false);
     const [lastSelector, setLastSelector] = useState('');
     const [breadcrumbs, setBreadcrumbs] = useState<string[]>([]);
@@ -18,6 +21,17 @@ export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
         prioritizeIds: true
     });
     const [newAttr, setNewAttr] = useState('');
+
+    useEffect(() => {
+        const handleResize = () => {
+            setPosition(prev => ({
+                x: Math.max(20, Math.min(prev.x, window.innerWidth - 340)),
+                y: Math.max(20, Math.min(prev.y, window.innerHeight - 100))
+            }));
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     useEffect(() => {
         // Load settings from storage on mount
