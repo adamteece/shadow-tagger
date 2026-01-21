@@ -10,7 +10,7 @@ interface OverlayProps {
 export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
     const [activeTab, setActiveTab] = useState<'feature' | 'page'>('feature');
     const [position, setPosition] = useState(() => ({
-        x: Math.max(20, window.innerWidth - 340),
+        x: Math.max(20, window.innerWidth - 350),
         y: 20
     }));
     const [isInspectorActive, setIsInspectorActive] = useState(false);
@@ -28,7 +28,7 @@ export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
     useEffect(() => {
         const handleResize = () => {
             setPosition(prev => ({
-                x: Math.max(20, Math.min(prev.x, window.innerWidth - 340)),
+                x: Math.max(20, Math.min(prev.x, window.innerWidth - 350)),
                 y: Math.max(20, Math.min(prev.y, window.innerHeight - 100))
             }));
         };
