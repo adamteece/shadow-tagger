@@ -186,7 +186,7 @@ export const OverlayContainer: React.FC<OverlayProps> = ({ inspector }) => {
                 border: '1px solid rgba(0, 0, 0, 0.1)',
                 borderRadius: '12px',
                 boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
-                zIndex: 2147483646,
+                zIndex: 2147483647,
                 fontFamily: 'system-ui, -apple-system, sans-serif',
                 overflow: 'hidden',
                 userSelect: 'none'

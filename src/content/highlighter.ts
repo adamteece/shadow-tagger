@@ -12,7 +12,7 @@ export class Highlighter {
         Object.assign(overlay.style, {
             position: 'fixed',
             pointerEvents: 'none',
-            zIndex: '2147483647',
+            zIndex: '2147483646',
             border: `2px solid ${borderColor}`,
             backgroundColor: bgColor,
             transition: 'all 0.05s ease-out',
